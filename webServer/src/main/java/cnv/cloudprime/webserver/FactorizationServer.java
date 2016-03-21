@@ -9,7 +9,7 @@ public class FactorizationServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(8000), 0);
         
         server.createContext("/factor", new RequestHandler());
-        server.setExecutor(null); // creates a default executor
+        server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.start();
         System.out.println("Server running");
         System.out.println("Ctrl-C to terminate server");

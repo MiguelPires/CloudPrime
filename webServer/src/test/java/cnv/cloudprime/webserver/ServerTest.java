@@ -9,36 +9,43 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.math3.primes.Primes;
+import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.Test;
 
 import com.sun.net.httpserver.HttpServer;
-import org.apache.commons.math3.primes.Primes;
 
 @SuppressWarnings("restriction")
 public class ServerTest {
-    private HttpServer server;
+    private static HttpServer server;
 
+    @Before
     public void setUp() throws IOException {
         try {
             if (server == null) {
                 server = HttpServer.create(new InetSocketAddress(8000), 0);
                 server.createContext("/factor", new RequestHandler());
-                server.setExecutor(null); // creates a default executor
+                server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
                 server.start();
             }
         } catch (Exception e) {
             return;
         }
-
+    }
+    
+    @AfterClass
+    public static void tearDownClass() {
+        server.stop(0);
     }
 
     @Test
     public void success() throws Exception {
-        setUp();
+        //setUp();
         URL newUserUrl = new URL("http://localhost:8000/factor/9");
-
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
 
         int responseCode = connection.getResponseCode();
@@ -48,40 +55,55 @@ public class ServerTest {
         InputStream inputStream = connection.getInputStream();
         BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
         String line = rd.readLine();
-        assertTrue("Wrong prime factors: " + line, line.equals("3 3"));
+        assertTrue("Wrong prime factors: " + line, line.equals("3, 3."));
         inputStream.close();
     }
 
     @Test
-    public void failureTwoFactorsNonPrime() throws Exception {
-        setUp();
+    public void twoFactorsNonPrime() throws Exception {
+      //  setUp();
         URL newUserUrl = new URL("http://localhost:8000/factor/8");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
-        assertTrue("Wrong response code '" + responseCode + "'. Should be 400",
-                responseCode == 400);
+        assertTrue("Wrong response code '" + responseCode + "'. Should be 200",
+                responseCode == 200);
+
+        InputStream inputStream = connection.getInputStream();
+        BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
+        String line = rd.readLine();
+        assertTrue("Wrong prime factors: " + line, line.equals("2, 2, 2."));
+        inputStream.close();
     }
 
     @Test
-    public void failureThreeFactors() throws Exception {
-        setUp();
+    public void threeFactors() throws Exception {
+   //     setUp();
         URL newUserUrl = new URL("http://localhost:8000/factor/27");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
-        assertTrue("Wrong response code '" + responseCode + "'. Should be 400",
-                responseCode == 400);
+        assertTrue("Wrong response code '" + responseCode + "'. Should be 200",
+                responseCode == 200);
+        
+        InputStream inputStream = connection.getInputStream();
+        BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
+        String line = rd.readLine();
+        assertTrue("Wrong prime factors: " + line, line.equals("3, 3, 3."));
+        inputStream.close();
     }
 
     @Test
-    public void loadTest() throws Exception {
-        setUp();
-        final int limit = 100;
-
-        for (int primeOne = 2; primeOne < limit; primeOne = Primes.nextPrime(primeOne + 1)) {
-            for (int primeTwo = 2; primeTwo < limit; primeTwo = Primes.nextPrime(primeTwo + 1)) {
-                int semiPrime = primeOne * primeTwo;
+    public void semiPrimes() throws Exception {
+     //   setUp();
+        final int inferiorLimit = 5;
+        final int superiorLimit = 30;
+        List<Thread> threads = new ArrayList<Thread>();
+        
+        for (int primeOne = inferiorLimit; primeOne < superiorLimit; primeOne = Primes.nextPrime(primeOne + 1)) {
+            for (int primeTwo = inferiorLimit; primeTwo < superiorLimit; primeTwo = Primes.nextPrime(primeTwo + 1)) {
+                final int semiPrime = primeOne * primeTwo;
 
                 final URL newUserUrl = new URL("http://localhost:8000/factor/" + semiPrime);
+                System.out.println("Testing with '" + newUserUrl + "'");
 
                 Thread thread = new Thread() {
                     public void run() {
@@ -95,7 +117,8 @@ public class ServerTest {
                                 new BufferedReader(new InputStreamReader(inputStream));
                             String line = rd.readLine();
                             inputStream.close();
-
+                          
+                            System.out.println("For semiprime "+semiPrime+" got "+line);
                             assertTrue("Wrong response code '" + responseCode + "'. Should be 200"
                                     + "\n" + line, responseCode == 200);
                         } catch (IOException e) {
@@ -103,10 +126,13 @@ public class ServerTest {
                         }
                     }
                 };
+                threads.add(thread);
                 thread.start();
-
             }
         }
-
+        
+        for (Thread t: threads) {
+            t.join();
+        }
     }
 }

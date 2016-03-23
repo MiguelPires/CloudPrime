@@ -6,4 +6,37 @@
     <version>0.0.1-SNAPSHOT</version>
   </parent>
   <artifactId>LoadBalancer</artifactId>
+
+  <dependencies>
+    <dependency>
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-java-sdk</artifactId>
+        <version>1.10.60</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+	<plugins>
+		<plugin>
+			<groupId>org.codehaus.mojo</groupId>
+			<artifactId>exec-maven-plugin</artifactId>
+			<version>1.2.1</version>
+			<executions>
+				<execution>
+					<goals>
+						<goal>java</goal>
+					</goals>
+				</execution>
+			</executions>
+			<configuration>
+				<mainClass>cnv.cloudprime.loadbalancer.LoadBalancer</mainClass>
+			</configuration>
+		</plugin>
+    	<plugin>
+    	    <groupId>org.apache.maven.plugins</groupId>
+        	<artifactId>maven-compiler-plugin</artifactId>
+        	<version>3.1</version>
+      	</plugin>
+	</plugins>
+  </build>
 </project>

@@ -1,44 +1,74 @@
 package cnv.cloudprime.loadbalancer;
+
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.math.BigInteger;
-import java.util.ArrayList;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
-import com.amazonaws.services.ec2.AmazonEC2;
+import com.amazonaws.services.ec2.model.Instance;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import cnv.cloudprime.loadbalancer.*;
 
 @SuppressWarnings("restriction")
-public class RequestHandler implements HttpHandler {
+public class RequestHandler
+        implements HttpHandler {
 
-	InstanceManager instanceManager = new InstanceManager();
+    private InstanceManager instanceManager;
 
-	public RequestHandler(){
+    public RequestHandler(InstanceManager manager) {
+        this.instanceManager = manager;
+    }
 
-	}
+    public void handle(HttpExchange exchange) throws IOException {
+        try {
+            String path = exchange.getRequestURI().toString();
 
-	public void handle(HttpExchange exchange) throws IOException {
-		String path = exchange.getRequestURI().toString();
-		if (/*exchange.getRequestMethod().equals("POST") && */path.contains("/factor/")) {
-			String inputNumber = exchange.getRequestURI().toString().replace("/factor/", "");
-			
-			// parse
-			BigInteger bigInt;
-			try {
-				bigInt = new BigInteger(inputNumber);
-			} catch (NumberFormatException e) {
-				String response = "This '" + inputNumber + "' is not a number";
-				System.out.println(response);
-				exchange.sendResponseHeaders(400, 0);
-				OutputStream outStream = exchange.getResponseBody();
-				outStream.write(response.getBytes());
-				outStream.close();
-				return;
-			}
+            // ignore other requests
+            if (/*exchange.getRequestMethod().equals("POST") && */!path.contains("/factor/"))
+                return;
 
-			instanceManager.getNextServer();
-		}
-	}
+            String inputNumber = exchange.getRequestURI().toString().replace("/factor/", "");
+            System.out.println("Request: " + exchange.getRequestURI());
 
+            try {
+                new BigInteger(inputNumber);
+            } catch (NumberFormatException e) {
+                String response = "This '" + inputNumber + "' is not a number";
+                System.out.println(response);
+                exchange.sendResponseHeaders(400, 0);
+                OutputStream outStream = exchange.getResponseBody();
+                outStream.write(response.getBytes());
+                outStream.close();
+                return;
+            }
+
+            Instance server = instanceManager.getNextServer();
+            //String serverIp = server.getPublicIpAddress();
+            String serverIp = "localhost";
+
+            URL url = new URL("http://" + serverIp + ":8001" + path);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            String response = "";
+
+            // read the response
+            int responseCode = connection.getResponseCode();
+            InputStream inputStream = connection.getInputStream();
+            BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
+            response += rd.readLine();
+
+            // forward the webserver's response
+            System.out.println("Forwarding response from server.");
+            exchange.sendResponseHeaders(responseCode, response.length());
+            OutputStream outStream = exchange.getResponseBody();
+            outStream.write(response.getBytes());
+            outStream.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println(e.getMessage());
+        }
+    }
 }

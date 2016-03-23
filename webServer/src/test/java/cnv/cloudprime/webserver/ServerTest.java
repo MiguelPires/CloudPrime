@@ -36,10 +36,11 @@ public class ServerTest {
             return;
         }
     }
-    
+
     @AfterClass
     public static void tearDownClass() {
-        server.stop(0);
+        if (server != null)
+            server.stop(0);
     }
 
     @Test
@@ -61,7 +62,7 @@ public class ServerTest {
 
     @Test
     public void twoFactorsNonPrime() throws Exception {
-      //  setUp();
+        //  setUp();
         URL newUserUrl = new URL("http://localhost:8000/factor/8");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
@@ -77,13 +78,13 @@ public class ServerTest {
 
     @Test
     public void threeFactors() throws Exception {
-   //     setUp();
+        //     setUp();
         URL newUserUrl = new URL("http://localhost:8000/factor/27");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
         assertTrue("Wrong response code '" + responseCode + "'. Should be 200",
                 responseCode == 200);
-        
+
         InputStream inputStream = connection.getInputStream();
         BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
         String line = rd.readLine();
@@ -93,13 +94,15 @@ public class ServerTest {
 
     @Test
     public void semiPrimes() throws Exception {
-     //   setUp();
+        //   setUp();
         final int inferiorLimit = 5;
         final int superiorLimit = 30;
         List<Thread> threads = new ArrayList<Thread>();
-        
-        for (int primeOne = inferiorLimit; primeOne < superiorLimit; primeOne = Primes.nextPrime(primeOne + 1)) {
-            for (int primeTwo = inferiorLimit; primeTwo < superiorLimit; primeTwo = Primes.nextPrime(primeTwo + 1)) {
+
+        for (int primeOne = inferiorLimit; primeOne < superiorLimit; primeOne =
+            Primes.nextPrime(primeOne + 1)) {
+            for (int primeTwo = inferiorLimit; primeTwo < superiorLimit; primeTwo =
+                Primes.nextPrime(primeTwo + 1)) {
                 final int semiPrime = primeOne * primeTwo;
 
                 final URL newUserUrl = new URL("http://localhost:8000/factor/" + semiPrime);
@@ -117,8 +120,8 @@ public class ServerTest {
                                 new BufferedReader(new InputStreamReader(inputStream));
                             String line = rd.readLine();
                             inputStream.close();
-                          
-                            System.out.println("For semiprime "+semiPrime+" got "+line);
+
+                            System.out.println("For semiprime " + semiPrime + " got " + line);
                             assertTrue("Wrong response code '" + responseCode + "'. Should be 200"
                                     + "\n" + line, responseCode == 200);
                         } catch (IOException e) {
@@ -130,8 +133,8 @@ public class ServerTest {
                 thread.start();
             }
         }
-        
-        for (Thread t: threads) {
+
+        for (Thread t : threads) {
             t.join();
         }
     }

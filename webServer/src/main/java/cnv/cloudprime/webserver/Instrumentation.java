@@ -30,6 +30,9 @@ public class Instrumentation {
         instrument(filename, method);
     }
 
+    /*
+     *  Injects calls to the instrumentation methods in the desired .class
+     */
     public static synchronized void instrument(String filename, String methodName) {
         File file = new File(filename);
 
@@ -58,8 +61,7 @@ public class Instrumentation {
                     // since these are liable to be less efficient 
                     instr.addBefore("cnv/cloudprime/webserver/Instrumentation", "incrByteCode", "");
 
-                    int code = instr.getOpcode();
-                    if (InstructionTable.OpcodeName[code].contains("invoke")) {
+                    if (InstructionTable.OpcodeName[instr.getOpcode()].contains("invoke")) {
                         instr.addBefore("cnv/cloudprime/webserver/Instrumentation", "incrCall", "");
                     }
                 }
@@ -68,6 +70,9 @@ public class Instrumentation {
         }
     }
 
+    /*
+     *  Stack Depth Metric - Increments the stack depth.
+     */
     public static synchronized void incrStackDepth(String __) {
         currentStackDepth++;
 
@@ -76,27 +81,36 @@ public class Instrumentation {
         }
     }
 
+    /*
+     *  Stack Depth Metric - Decrements the stack depth
+     */
     public static synchronized void decrStackDepth(String __) throws FileNotFoundException {
         currentStackDepth--;
 
         if (currentStackDepth == 0) {
             flushMetrics();
-
-            maxStackDepth = 0;
-            bytesExecuted = 0;
-            calls = 0;
+            clearMetrics();
         }
     }
 
+    /*
+     * Byte Code Metric - Increments the executed byte code
+     */
     public static synchronized void incrByteCode(String __) {
         bytesExecuted++;
     }
 
 
+    /*
+     *  Method Calls Metric - Increments the number of calls
+     */
     public static synchronized void incrCall(String __) {
         calls++;
     }
 
+    /*
+     *  Logs every metric to disk after the execution ends 
+     */
     public static synchronized void flushMetrics() throws FileNotFoundException {
         PrintWriter writer = new PrintWriter(new FileOutputStream(new File("metrics.log"), true));
         long threadId = Thread.currentThread().getId();
@@ -107,5 +121,15 @@ public class Instrumentation {
         writer.write("Thread: " + threadId + " - Function calls: " + calls + "\n");
 
         writer.close();
+    }
+
+    /*
+     *  Clears the metrics' value  
+     */
+    public static synchronized void clearMetrics() {
+        currentStackDepth = 0;
+        maxStackDepth = 0;
+        bytesExecuted = 0;
+        calls = 0;
     }
 }

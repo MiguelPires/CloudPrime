@@ -77,3 +77,6 @@ buildNumber.properties
 .mvn/timing.properties
 
 metrics.log
+
+*.pem 
+credentials

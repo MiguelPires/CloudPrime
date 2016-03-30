@@ -21,7 +21,7 @@ public class Client {
             for (int primeTwo = 2; primeTwo < LIMIT; primeTwo = Primes.nextPrime(primeTwo + 1)) {
                 final int semiPrime = primeOne * primeTwo;
 
-                final URL newUserUrl = new URL("http://localhost:8000/factor/" + semiPrime);
+                final URL newUserUrl = new URL("http://<load-balancer-DNS-name>/f.html?n=" + semiPrime);
 
                 Thread thread = new Thread() {
                     public void run() {

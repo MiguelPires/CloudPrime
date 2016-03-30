@@ -2,7 +2,7 @@ To build the project run:
 	mvn clean install
 
 To instrument the server run:
-	java -cp target/classes cnv.cloudprime.webserver.Instrumentation "target/classes/cnv/cloudprime/webserver/RequestHandler.class"
+	java -cp target/classes cnv.cloudprime.webserver.Instrumentation "target/classes/cnv/cloudprime/webserver/IntFactorization.class"
 
 To run the server:
 	mvn exec:java

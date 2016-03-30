@@ -27,8 +27,8 @@ public class ServerTest {
     public void setUp() throws IOException {
         try {
             if (server == null) {
-                server = HttpServer.create(new InetSocketAddress(8000), 0);
-                server.createContext("/factor", new RequestHandler());
+                server = HttpServer.create(new InetSocketAddress(80), 0);
+                server.createContext("/", new RequestHandler());
                 server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
                 server.start();
             }
@@ -45,8 +45,7 @@ public class ServerTest {
 
     @Test
     public void success() throws Exception {
-        //setUp();
-        URL newUserUrl = new URL("http://localhost:8000/factor/9");
+        URL newUserUrl = new URL("http://localhost/f.html?n=9");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
 
         int responseCode = connection.getResponseCode();
@@ -63,7 +62,7 @@ public class ServerTest {
     @Test
     public void twoFactorsNonPrime() throws Exception {
         //  setUp();
-        URL newUserUrl = new URL("http://localhost:8000/factor/8");
+        URL newUserUrl = new URL("http://localhost/f.html?n=8");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
         assertTrue("Wrong response code '" + responseCode + "'. Should be 200",
@@ -79,7 +78,7 @@ public class ServerTest {
     @Test
     public void threeFactors() throws Exception {
         //     setUp();
-        URL newUserUrl = new URL("http://localhost:8000/factor/27");
+        URL newUserUrl = new URL("http://localhost/f.html?n=27");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
         assertTrue("Wrong response code '" + responseCode + "'. Should be 200",
@@ -95,8 +94,8 @@ public class ServerTest {
     @Test
     public void semiPrimes() throws Exception {
         //   setUp();
-        final int inferiorLimit = 5;
-        final int superiorLimit = 30;
+        final int inferiorLimit = 10;
+        final int superiorLimit = 100;
         List<Thread> threads = new ArrayList<Thread>();
 
         for (int primeOne = inferiorLimit; primeOne < superiorLimit; primeOne =
@@ -105,37 +104,49 @@ public class ServerTest {
                 Primes.nextPrime(primeTwo + 1)) {
                 final int semiPrime = primeOne * primeTwo;
 
-                final URL newUserUrl = new URL("http://localhost:8000/factor/" + semiPrime);
+                final URL newUserUrl = new URL("http://localhost/f.html?n=" + semiPrime);
                 System.out.println("Testing with '" + newUserUrl + "'");
 
-                Thread thread = new Thread() {
-                    public void run() {
-                        try {
-                            HttpURLConnection connection =
-                                (HttpURLConnection) newUserUrl.openConnection();
-                            int responseCode = connection.getResponseCode();
+                try {
+                    Thread thread = new Thread() {
+                        public void run() {
+                            try {
+                                HttpURLConnection connection =
+                                    (HttpURLConnection) newUserUrl.openConnection();
+                                int responseCode = connection.getResponseCode();
 
-                            InputStream inputStream = connection.getInputStream();
-                            BufferedReader rd =
-                                new BufferedReader(new InputStreamReader(inputStream));
-                            String line = rd.readLine();
-                            inputStream.close();
+                                InputStream inputStream = connection.getInputStream();
+                                BufferedReader rd =
+                                    new BufferedReader(new InputStreamReader(inputStream));
+                                String line = rd.readLine();
+                                inputStream.close();
 
-                            System.out.println("For semiprime " + semiPrime + " got " + line);
-                            assertTrue("Wrong response code '" + responseCode + "'. Should be 200"
-                                    + "\n" + line, responseCode == 200);
-                        } catch (IOException e) {
-                            e.printStackTrace();
+                                System.out.println("For semiprime " + semiPrime + " got " + line);
+                                assertTrue("Wrong response code '" + responseCode
+                                        + "'. Should be 200" + "\n" + line, responseCode == 200);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
                         }
-                    }
-                };
-                threads.add(thread);
-                thread.start();
+                    };
+                    thread.start();
+                    threads.add(thread);
+                } catch (Exception e) {
+                    // The system probably ran out of memory...
+                    System.out.println(e.getMessage());
+                    e.printStackTrace();
+                }
+
             }
         }
 
         for (Thread t : threads) {
-            t.join();
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                System.out.println(e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 }

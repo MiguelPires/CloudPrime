@@ -28,10 +28,12 @@ public class RequestHandler
             String path = exchange.getRequestURI().toString();
 
             // ignore other requests
-            if (/*exchange.getRequestMethod().equals("POST") && */!path.contains("/factor/"))
+            if (!path.startsWith("/f.html?n=")) {
+                exchange.sendResponseHeaders(404, 0);
                 return;
+            }
 
-            String inputNumber = exchange.getRequestURI().toString().replace("/factor/", "");
+            String inputNumber = exchange.getRequestURI().toString().replace("/f.html?n=", "");
             System.out.println("Request: " + exchange.getRequestURI());
 
             try {
@@ -39,16 +41,18 @@ public class RequestHandler
             } catch (NumberFormatException e) {
                 String response = "This '" + inputNumber + "' is not a number";
                 System.out.println(response);
-                exchange.sendResponseHeaders(400, 0);
+                exchange.sendResponseHeaders(400, response.length());
                 OutputStream outStream = exchange.getResponseBody();
                 outStream.write(response.getBytes());
                 outStream.close();
                 return;
             }
 
-            Instance server = instanceManager.getNextServer();
-            //String serverIp = server.getPublicIpAddress();
-            String serverIp = "localhost";
+            WebServer server = instanceManager.getNextServer();
+            if (server == null)
+                return;
+            String serverIp = server.getInstance().getPublicIpAddress();
+            //String serverIp = "localhost";
 
             URL url = new URL("http://" + serverIp + ":8001" + path);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();

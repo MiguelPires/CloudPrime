@@ -1,0 +1,15 @@
+sudo yum -y update;
+sudo yum -y install java-devel;
+wget http://mirror.olnevhost.net/pub/apache/maven/maven-3/3.0.5/binaries/apache-maven-3.0.5-bin.tar.gz;
+tar xvf apache-maven-3.0.5-bin.tar.gz;
+sudo mv apache-maven-3.0.5  /usr/local/apache-maven;
+echo "export M2_HOME=/usr/local/apache-maven" >> ~/.bashrc;
+echo "export M2=\$M2_HOME/bin" >> ~/.bashrc;
+echo "export PATH=\$M2:\$PATH" >> ~/.bashrc;
+source ~/.bashrc;
+echo "cd CloudPrime;
+mvn clean install -DskipTests;
+cd webServer;
+java -cp target/classes cnv.cloudprime.webserver.Instrumentation \"target/classes/cnv/cloudprime/webserver/IntFactorization.class\";
+mvn exec:java;" >> /etc/rc.local;
+source /etc/rc.local;

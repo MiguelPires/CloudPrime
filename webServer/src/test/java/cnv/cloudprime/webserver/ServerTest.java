@@ -27,7 +27,7 @@ public class ServerTest {
     public void setUp() throws IOException {
         try {
             if (server == null) {
-                server = HttpServer.create(new InetSocketAddress(80), 0);
+                server = HttpServer.create(new InetSocketAddress(8000), 0);
                 server.createContext("/", new RequestHandler());
                 server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
                 server.start();
@@ -45,7 +45,7 @@ public class ServerTest {
 
     @Test
     public void success() throws Exception {
-        URL newUserUrl = new URL("http://localhost/f.html?n=9");
+        URL newUserUrl = new URL("http://localhost:8000/f.html?n=9");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
 
         int responseCode = connection.getResponseCode();
@@ -61,8 +61,7 @@ public class ServerTest {
 
     @Test
     public void twoFactorsNonPrime() throws Exception {
-        //  setUp();
-        URL newUserUrl = new URL("http://localhost/f.html?n=8");
+        URL newUserUrl = new URL("http://localhost:8000/f.html?n=8");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
         assertTrue("Wrong response code '" + responseCode + "'. Should be 200",
@@ -78,7 +77,7 @@ public class ServerTest {
     @Test
     public void threeFactors() throws Exception {
         //     setUp();
-        URL newUserUrl = new URL("http://localhost/f.html?n=27");
+        URL newUserUrl = new URL("http://localhost:8000/f.html?n=27");
         HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
         int responseCode = connection.getResponseCode();
         assertTrue("Wrong response code '" + responseCode + "'. Should be 200",
@@ -93,7 +92,6 @@ public class ServerTest {
 
     @Test
     public void semiPrimes() throws Exception {
-        //   setUp();
         final int inferiorLimit = 10;
         final int superiorLimit = 100;
         List<Thread> threads = new ArrayList<Thread>();
@@ -104,7 +102,7 @@ public class ServerTest {
                 Primes.nextPrime(primeTwo + 1)) {
                 final int semiPrime = primeOne * primeTwo;
 
-                final URL newUserUrl = new URL("http://localhost/f.html?n=" + semiPrime);
+                final URL newUserUrl = new URL("http://localhost:8000/f.html?n=" + semiPrime);
                 System.out.println("Testing with '" + newUserUrl + "'");
 
                 try {
@@ -136,7 +134,6 @@ public class ServerTest {
                     System.out.println(e.getMessage());
                     e.printStackTrace();
                 }
-
             }
         }
 

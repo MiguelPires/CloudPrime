@@ -42,11 +42,11 @@ public class Instrumentation {
 
             ClassInfo ci = new ClassInfo(absolutePathFile);
             Vector<?> routines = ci.getRoutines();
-
+            
             for (Enumeration<?> e = routines.elements(); e.hasMoreElements();) {
                 Routine routine = (Routine) e.nextElement();
-
                 if (routine.getMethodName().equals(methodName)) {
+                    
                     routine.addBefore("cnv/cloudprime/webserver/Instrumentation", "incrStackDepth",
                             "");
                     routine.addAfter("cnv/cloudprime/webserver/Instrumentation", "decrStackDepth",
@@ -63,7 +63,7 @@ public class Instrumentation {
 
                     if (InstructionTable.OpcodeName[instr.getOpcode()].contains("invoke")) {
                         instr.addBefore("cnv/cloudprime/webserver/Instrumentation", "incrCall", "");
-                    }
+                    } 
                 }
             }
             ci.write(filename);

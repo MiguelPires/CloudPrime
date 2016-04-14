@@ -7,7 +7,6 @@ import java.util.List;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import cnv.cloudprime.webserver.*;
 
 @SuppressWarnings("restriction")
 public class RequestHandler
@@ -52,7 +51,5 @@ public class RequestHandler
         outStream.close();
 
         System.out.println("Responding to " + inputNumber + " with " + response);
-
-
     }
 }

@@ -2,10 +2,9 @@ package cnv.cloudprime.webserver;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.PrintWriter;
 import java.util.Enumeration;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
 
 import BIT.highBIT.ClassInfo;
 import BIT.highBIT.Instruction;
@@ -14,10 +13,8 @@ import BIT.highBIT.Routine;
 
 public class Instrumentation {
 
-    private static int maxStackDepth = 0;
-    private static int currentStackDepth = 0;
-    private static int bytesExecuted = 0;
-    private static int calls = 0;
+    // can't use diamong operator => 1.4
+    private static ConcurrentHashMap metrics = new ConcurrentHashMap();
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -42,11 +39,11 @@ public class Instrumentation {
 
             ClassInfo ci = new ClassInfo(absolutePathFile);
             Vector<?> routines = ci.getRoutines();
-            
+
             for (Enumeration<?> e = routines.elements(); e.hasMoreElements();) {
                 Routine routine = (Routine) e.nextElement();
                 if (routine.getMethodName().equals(methodName)) {
-                    
+
                     routine.addBefore("cnv/cloudprime/webserver/Instrumentation", "incrStackDepth",
                             "");
                     routine.addAfter("cnv/cloudprime/webserver/Instrumentation", "decrStackDepth",
@@ -63,7 +60,7 @@ public class Instrumentation {
 
                     if (InstructionTable.OpcodeName[instr.getOpcode()].contains("invoke")) {
                         instr.addBefore("cnv/cloudprime/webserver/Instrumentation", "incrCall", "");
-                    } 
+                    }
                 }
             }
             ci.write(filename);
@@ -74,62 +71,48 @@ public class Instrumentation {
      *  Stack Depth Metric - Increments the stack depth.
      */
     public static synchronized void incrStackDepth(String __) {
-        currentStackDepth++;
-
-        if (currentStackDepth > maxStackDepth) {
-            maxStackDepth = currentStackDepth;
-        }
+        Metrics threadMetrics = getOrCreate();
+        threadMetrics.incrStackDepth(__);
     }
 
     /*
      *  Stack Depth Metric - Decrements the stack depth
      */
     public static synchronized void decrStackDepth(String __) throws FileNotFoundException {
-        currentStackDepth--;
-
-        if (currentStackDepth == 0) {
-            flushMetrics();
-            clearMetrics();
-        }
+        Metrics threadMetrics = getOrCreate();
+        threadMetrics.decrStackDepth(__);
     }
 
     /*
      * Byte Code Metric - Increments the executed byte code
      */
     public static synchronized void incrByteCode(String __) {
-        bytesExecuted++;
+        Metrics threadMetrics = getOrCreate();
+        threadMetrics.incrByteCode(__);
     }
-
 
     /*
      *  Method Calls Metric - Increments the number of calls
      */
     public static synchronized void incrCall(String __) {
-        calls++;
+        Metrics threadMetrics = getOrCreate();
+        threadMetrics.incrCall(__);
     }
 
     /*
      *  Logs every metric to disk after the execution ends 
      */
     public static synchronized void flushMetrics() throws FileNotFoundException {
-        PrintWriter writer = new PrintWriter(new FileOutputStream(new File("metrics.log"), true));
-        long threadId = Thread.currentThread().getId();
-
-        // write metrics
-        writer.write("Thread: " + threadId + " - Max depth: " + maxStackDepth + "\n");
-        writer.write("Thread: " + threadId + " - Bytes executed: " + bytesExecuted + "\n");
-        writer.write("Thread: " + threadId + " - Function calls: " + calls + "\n");
-
-        writer.close();
+        Metrics threadMetrics = getOrCreate();
+        threadMetrics.flushMetrics();
     }
 
-    /*
-     *  Clears the metrics' value  
-     */
-    public static synchronized void clearMetrics() {
-        currentStackDepth = 0;
-        maxStackDepth = 0;
-        bytesExecuted = 0;
-        calls = 0;
+    private static Metrics getOrCreate() {
+        long threadId = Thread.currentThread().getId();
+        if (!metrics.containsKey(threadId))
+            metrics.put(threadId, new Metrics());
+
+        Metrics threadMetrics = (Metrics) metrics.get(threadId);
+        return threadMetrics;
     }
 }

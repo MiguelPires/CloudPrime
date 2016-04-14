@@ -8,7 +8,7 @@ public class FactorizationServer {
         
         HttpServer server = HttpServer.create(new InetSocketAddress(8000), 0);
         
-        server.createContext("/", new RequestHandler());
+        server.createContext("/f.html", new RequestHandler());
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.start();
         System.out.println("Server running");

@@ -16,24 +16,27 @@ public class HighLoadClient {
             BigInteger number = BigInteger.valueOf(11566174444L);
 
             final URL newUserUrl =
-                new URL("http://cnv-checkpoint-1585225389.eu-west-1.elb.amazonaws.com/f.html?n="
+                new URL("http://52.30.118.248:8000/f.html?n="
                         + number.toString(10));
+            
+            while (true) {
+                HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
+                int responseCode = connection.getResponseCode();
 
-            HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
-            int responseCode = connection.getResponseCode();
+                InputStream inputStream = connection.getInputStream();
+                BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
+                String line = rd.readLine();
+                inputStream.close();
 
-            InputStream inputStream = connection.getInputStream();
-            BufferedReader rd = new BufferedReader(new InputStreamReader(inputStream));
-            String line = rd.readLine();
-            inputStream.close();
+                if (responseCode != 200) {
+                    System.out.println("Responded with '" + responseCode + "' to number " + number);
+                    System.out.println("Message: " + line);
+                } else {
+                    System.out.println("Responded with '" + line + "'");
 
-            if (responseCode != 200) {
-                System.out.println("Responded with '" + responseCode + "' to number " + number);
-                System.out.println("Message: " + line);
-            } else {
-                System.out.println("Responded with '" + line + "'");
-
+                }
             }
+           
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Request failed");

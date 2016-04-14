@@ -6,6 +6,10 @@
     <version>0.0.1-SNAPSHOT</version>
   </parent>
   <artifactId>LoadBalancer</artifactId>
+  
+  <properties>
+    <inAWS>false</inAWS>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -30,6 +34,7 @@
 			</executions>
 			<configuration>
 				<mainClass>cnv.cloudprime.loadbalancer.LoadBalancer</mainClass>
+				<arguments>${inAWS}</arguments>
 			</configuration>
 		</plugin>
     	<plugin>

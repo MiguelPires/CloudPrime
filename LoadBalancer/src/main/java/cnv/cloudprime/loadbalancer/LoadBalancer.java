@@ -7,9 +7,10 @@ import com.sun.net.httpserver.HttpServer;
 public class LoadBalancer {
 
 	public static void main(String[] args) throws Exception {
-		HttpServer server = HttpServer.create(new InetSocketAddress(80), 0);
-
-		InstanceManager manager = new InstanceManager();
+	    String inAWS = args[0];
+	    
+	    HttpServer server = HttpServer.create(new InetSocketAddress(80), 0);
+		InstanceManager manager = new InstanceManager(inAWS);
 		server.createContext("/", new RequestHandler(manager));
 		server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
 		server.start();

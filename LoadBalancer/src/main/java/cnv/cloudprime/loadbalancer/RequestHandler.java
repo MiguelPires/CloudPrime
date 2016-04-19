@@ -49,8 +49,10 @@ public class RequestHandler
             WebServer server = instanceManager.getNextServer();
             if (server == null)
                 return;
+            
             String serverIp = server.getInstance().getPublicIpAddress();
-            //String serverIp = "localhost";
+            System.out.println(
+                    "Forwarding request to server " + server.getInstance().getInstanceId());
 
             URL url = new URL("http://" + serverIp + ":8000" + path);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -69,8 +71,11 @@ public class RequestHandler
             outStream.write(response.getBytes());
             outStream.close();
         } catch (Exception e) {
-            e.printStackTrace();
-            //System.out.println(e.getMessage());
+            exchange.sendResponseHeaders(404, e.getMessage().length());
+            OutputStream outStream = exchange.getResponseBody();
+            outStream.write(e.getMessage().getBytes());
+            outStream.close();
+            System.out.println(e.getMessage());
         }
     }
 }

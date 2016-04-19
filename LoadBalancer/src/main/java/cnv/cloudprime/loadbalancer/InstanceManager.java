@@ -18,6 +18,7 @@ import com.amazonaws.services.ec2.model.Instance;
 import com.amazonaws.services.ec2.model.InstanceState;
 import com.amazonaws.services.ec2.model.Reservation;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
+import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 
 public class InstanceManager {
 
@@ -91,7 +92,7 @@ public class InstanceManager {
             lastIndex = (++lastIndex) % instances.size();
             String newId = instanceIds.get(lastIndex);
             WebServer server = instances.get(newId);
-            
+
             try {
                 if (server.getInstance().getState().getCode() != RUNNING_CODE) {
                     System.out.println(
@@ -113,7 +114,8 @@ public class InstanceManager {
 
         runInstancesRequest.withImageId("ami-e4d75b97").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
-                .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738").withMonitoring(true);
+                .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738")
+                .withMonitoring(true);
 
         ec2Client.runInstances(runInstancesRequest);
         updateInstances();
@@ -121,6 +123,25 @@ public class InstanceManager {
 
     public void decreaseGroup(int instancesNum) {
         throw new UnsupportedOperationException();
+
+        /*for (String instanceId : instanceIds) {
+            // find server without requests and remove them
+        }*/
+    }
+
+    public void decreaseGroup(String instanceId) {
+        System.out.println("Removing a server");
+
+        try {
+            TerminateInstancesRequest terminationRequest = new TerminateInstancesRequest();
+            terminationRequest.withInstanceIds(instanceId);
+            ec2Client.terminateInstances(terminationRequest);
+            instanceIds.remove(instanceId);
+            instances.remove(instanceId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Couldn't remove instance " + instanceId);
+        }
     }
 
     public int runningInstances() {

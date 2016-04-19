@@ -12,14 +12,13 @@ import java.net.URL;
 public class HighLoadClient {
 
     public static void main(String[] args) throws MalformedURLException {
-        try {
-            BigInteger number = BigInteger.valueOf(11566174444L);
+        BigInteger number = BigInteger.valueOf(11566174444L);
 
-            final URL newUserUrl =
-                new URL("http://localhost/f.html?n="
-                        + number.toString(10));
-            
-            while (true) {
+        final URL newUserUrl = new URL("http://localhost/f.html?n=" + number.toString(10));
+
+        while (true) {
+            try {
+                System.out.println("Requesting");
                 HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
                 int responseCode = connection.getResponseCode();
 
@@ -33,13 +32,11 @@ public class HighLoadClient {
                     System.out.println("Message: " + line);
                 } else {
                     System.out.println("Responded with '" + line + "'");
-
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("Request failed");
             }
-           
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.out.println("Request failed");
         }
     }
 }

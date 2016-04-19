@@ -14,18 +14,19 @@ import com.amazonaws.services.cloudwatch.model.GetMetricStatisticsResult;
 public class AutoScaler
         implements Runnable {
 
-    private AmazonCloudWatchClient cloudWatchClient;
+    AmazonCloudWatchClient cloudWatchClient;
     private InstanceManager instanceManager;
     private GetMetricStatisticsRequest metricsRequest;
 
     private static final int MIN_INSTANCES = 1;
     private static final int MAX_INSTANCES = 2;
-    // this is measured in percentage
-    private static final double MAX_AVG_CPU = 50;
+    // these are measured in percentage
+    private static final float MAX_AVG_CPU = 50.0f;
+    private static final float MIN_AVG_CPU = 5.0f;
     //  this is measured in milliseconds
     private static final int CHECK_PERIOD = 4000;
     // this is measured in seconds
-    private static final int COOLDOWN_PERIOD = 120;
+    private static final int COOLDOWN_PERIOD = 240;
     //
 
     private int lastScale;
@@ -49,7 +50,6 @@ public class AutoScaler
 
             instanceManager.updateInstances();
             instanceManager.printInstanceIds();
-
 
             System.out.println("Available replicas: " + instanceManager.runningInstances()
                     + "\nPending replicas: " + instanceManager.pendingInstances());
@@ -83,19 +83,21 @@ public class AutoScaler
                     cloudWatchClient.getMetricStatistics(metricsRequest);
                 List<Datapoint> dataPoints = result.getDatapoints();
 
-                // for debug purposes
-                System.out.print("Points: ");
-                for (Datapoint point : dataPoints) {
-                    System.out.print(" " + point.getAverage());
-                }
-                System.out.println("");
-
                 if (dataPoints != null && !dataPoints.isEmpty()) {
+                    // for debug purposes
+                    System.out.print("Points: ");
+                    for (Datapoint point : dataPoints) {
+                        System.out.print(" " + point.getAverage());
+                    }
+                    System.out.println("");
+
                     Datapoint point = dataPoints.get(dataPoints.size() - 1);
                     System.out.println("Current CPU load: " + point.getAverage());
 
                     if (point.getAverage() > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
                         instanceManager.increaseGroup(1);
+                    } else if (point.getAverage() < MIN_AVG_CPU && clusterSize > MIN_INSTANCES) {
+                        instanceManager.decreaseGroup(server.getInstance().getInstanceId());
                     }
                 }
             }

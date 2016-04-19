@@ -16,7 +16,7 @@ public class HighLoadClient {
             BigInteger number = BigInteger.valueOf(11566174444L);
 
             final URL newUserUrl =
-                new URL("http://52.30.118.248:8000/f.html?n="
+                new URL("http://localhost/f.html?n="
                         + number.toString(10));
             
             while (true) {

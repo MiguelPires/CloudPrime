@@ -22,6 +22,7 @@ public class IntFactorization {
             long millis = System.currentTimeMillis();
 
             writer.write("Thread: " + threadId + " - Time: " + millis + "\n");
+            writer.write("Thread: " + threadId + " - Factor: " + num.toString(10) + "\n");
             writer.close();
             firstIter = false;
         }

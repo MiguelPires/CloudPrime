@@ -3,6 +3,7 @@ package cnv.cloudprime.loadbalancer;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Scanner;
@@ -21,7 +22,10 @@ import com.amazonaws.services.ec2.model.RunInstancesRequest;
 public class InstanceManager {
 
     private AmazonEC2Client ec2Client;
-    private int lastServer = 0;
+    private int lastIndex = 0;
+
+    //
+    private List<String> instanceIds = new ArrayList<String>();
     // running instances
     private ConcurrentHashMap<String, WebServer> instances =
         new ConcurrentHashMap<String, WebServer>();
@@ -77,20 +81,29 @@ public class InstanceManager {
     }
 
     public WebServer getNextServer() {
-        if (instances.size() != 0) {
-            lastServer = (++lastServer) % instances.size();
-            WebServer server = instances.get(lastServer);
-            if (server.getInstance().getState().getCode() != RUNNING_CODE) {
-                System.out.println(
-                        "Server '" + server.getInstance().getInstanceId() + "' isn't running");
-                return null;
-
-            } else
-                return server;
-        } else {
+        int MAX_TRIES = 3;
+        if (instances.size() == 0) {
             System.out.println("There are no servers available");
             return null;
         }
+
+        for (int i = 0; i < MAX_TRIES; ++i) {
+            lastIndex = (++lastIndex) % instances.size();
+            String newId = instanceIds.get(lastIndex);
+            WebServer server = instances.get(newId);
+            
+            try {
+                if (server.getInstance().getState().getCode() != RUNNING_CODE) {
+                    System.out.println(
+                            "Server '" + server.getInstance().getInstanceId() + "' isn't running");
+                } else
+                    return server;
+            } catch (Exception e) {
+                System.out.println("Server " + server.getInstance() + " is down");
+            }
+        }
+
+        return null;
     }
 
     public void increaseGroup(int instancesNum) {
@@ -98,9 +111,9 @@ public class InstanceManager {
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
-        runInstancesRequest.withImageId("ami-5136b022").withInstanceType("t2.micro").withMinCount(1)
+        runInstancesRequest.withImageId("ami-e4d75b97").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
-                .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738");
+                .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738").withMonitoring(true);
 
         ec2Client.runInstances(runInstancesRequest);
         updateInstances();
@@ -120,7 +133,7 @@ public class InstanceManager {
 
     public void printInstanceIds() {
         System.out.println("Ids:");
-        for (String id : instances.keySet()) {
+        for (String id : instanceIds) {
             System.out.println(id);
         }
     }
@@ -152,6 +165,7 @@ public class InstanceManager {
                         }
 
                         instances.put(instance.getInstanceId(), server);
+                        instanceIds.add(instance.getInstanceId());
                         System.out.println("Found new server: " + instance.getInstanceId());
                         printInstanceIds();
                     } else if (instanceCode == PENDING_CODE) {
@@ -181,8 +195,10 @@ public class InstanceManager {
                 }
             }
 
-            if (!foundInstance)
+            if (!foundInstance) {
                 instances.remove(instanceId);
+                instanceIds.remove(instanceId);
+            }
         }
 
         // Take the running instances out of the pending list
@@ -204,6 +220,7 @@ public class InstanceManager {
                             WebServer server = pendingInstances.get(instanceId);
                             pendingInstances.remove(instanceId);
                             instances.put(instanceId, server);
+                            instanceIds.add(instanceId);
 
                             foundServer = true;
                             break;

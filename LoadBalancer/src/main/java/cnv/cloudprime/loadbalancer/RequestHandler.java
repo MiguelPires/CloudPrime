@@ -9,11 +9,9 @@ import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-import com.amazonaws.services.ec2.model.Instance;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
-@SuppressWarnings("restriction")
 public class RequestHandler
         implements HttpHandler {
 
@@ -54,7 +52,7 @@ public class RequestHandler
             String serverIp = server.getInstance().getPublicIpAddress();
             //String serverIp = "localhost";
 
-            URL url = new URL("http://" + serverIp + ":8001" + path);
+            URL url = new URL("http://" + serverIp + ":8000" + path);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             String response = "";
 
@@ -72,7 +70,7 @@ public class RequestHandler
             outStream.close();
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println(e.getMessage());
+            //System.out.println(e.getMessage());
         }
     }
 }

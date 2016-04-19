@@ -2,6 +2,7 @@ package cnv.cloudprime.loadbalancer;
 
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClient;
@@ -22,7 +23,12 @@ public class AutoScaler
     // this is measured in percentage
     private static final double MAX_AVG_CPU = 50;
     //  this is measured in milliseconds
-    private static final int CHECK_PERIOD = 2500;
+    private static final int CHECK_PERIOD = 4000;
+    // this is measured in seconds
+    private static final int COOLDOWN_PERIOD = 120;
+    //
+
+    private int lastScale;
 
     public AutoScaler(InstanceManager manager) {
         instanceManager = manager;
@@ -31,25 +37,30 @@ public class AutoScaler
                 new ProfileCredentialsProvider("credentials", "default").getCredentials())
                         //cloudWatchClient = new AmazonCloudWatchClient(new ProfileCredentialsProvider("default").getCredentials())
                         .withEndpoint("http://monitoring.eu-west-1.amazonaws.com");
-        metricsRequest = new GetMetricStatisticsRequest().withMetricName("CPUUtilization")
-                .withStatistics("Average")
-                .withStartTime(new Date(new Date().getTime() - 1000 * 60 * 10)) //10 min ago
-                .withEndTime(new Date()).withPeriod(60).withNamespace("AWS/EC2");
     }
 
     public void run() {
-        try {
-            Thread.sleep(CHECK_PERIOD);
-        } catch (InterruptedException e1) {
-            e1.printStackTrace();
-        }
         while (true) {
+            try {
+                Thread.sleep(CHECK_PERIOD);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
             instanceManager.updateInstances();
             instanceManager.printInstanceIds();
 
+
+            System.out.println("Available replicas: " + instanceManager.runningInstances()
+                    + "\nPending replicas: " + instanceManager.pendingInstances());
             int clusterSize =
                 instanceManager.runningInstances() + instanceManager.pendingInstances();
-            System.out.println("Cluster size is " + clusterSize);
+
+            // if the last scaling activity was too soon ago, we wait  
+            if (new Date().getTime() - lastScale <= 1000 * COOLDOWN_PERIOD) {
+                System.out.println("Cooldown period");
+                continue;
+            }
 
             if (clusterSize < MIN_INSTANCES) {
                 instanceManager.increaseGroup(MIN_INSTANCES - clusterSize);
@@ -62,23 +73,31 @@ public class AutoScaler
                 instanceDimension.setName("InstanceId");
                 instanceDimension.setValue(server.getInstance().getInstanceId());
 
+                metricsRequest = new GetMetricStatisticsRequest().withMetricName("CPUUtilization")
+                        .withStatistics("Average")
+                        .withStartTime(new Date(new Date().getTime() - 1000 * 60 * 10)) //10 min ago
+                        .withEndTime(new Date()).withPeriod(60).withNamespace("AWS/EC2");
                 metricsRequest.setDimensions(Arrays.asList(instanceDimension));
 
                 GetMetricStatisticsResult result =
                     cloudWatchClient.getMetricStatistics(metricsRequest);
-                for (Datapoint point : result.getDatapoints()) {
-                    System.out.println("CPU load: " + point.getAverage());
+                List<Datapoint> dataPoints = result.getDatapoints();
+
+                // for debug purposes
+                System.out.print("Points: ");
+                for (Datapoint point : dataPoints) {
+                    System.out.print(" " + point.getAverage());
+                }
+                System.out.println("");
+
+                if (dataPoints != null && !dataPoints.isEmpty()) {
+                    Datapoint point = dataPoints.get(dataPoints.size() - 1);
+                    System.out.println("Current CPU load: " + point.getAverage());
 
                     if (point.getAverage() > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
                         instanceManager.increaseGroup(1);
                     }
                 }
-            }
-
-            try {
-                Thread.sleep(CHECK_PERIOD);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             }
         }
     }

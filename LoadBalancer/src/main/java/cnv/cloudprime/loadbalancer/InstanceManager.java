@@ -1,6 +1,7 @@
 package cnv.cloudprime.loadbalancer;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -21,11 +22,14 @@ import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 
 public class InstanceManager {
+    // this is measured in seconds
+    private static final int GRACE_PERIOD = 120;
+    public static final int RUNNING_CODE = 16;
+    public static final int PENDING_CODE = 0;
 
     private AmazonEC2Client ec2Client;
     private int lastIndex = 0;
-
-    //
+    // list of instance identifiers
     private List<String> instanceIds = new ArrayList<String>();
     // running instances
     private ConcurrentHashMap<String, WebServer> instances =
@@ -36,8 +40,6 @@ public class InstanceManager {
     // this instance's id
     String localInstanceId = "";
 
-    public static final int RUNNING_CODE = 16;
-    public static final int PENDING_CODE = 0;
 
     public InstanceManager(String inAWS) throws IOException {
         if (inAWS.equals("true")) {
@@ -81,30 +83,49 @@ public class InstanceManager {
         return ec2Client;
     }
 
-    public WebServer getNextServer() {
+    /*
+     *  Returns a request index and a server (as an output parameter)
+     *  If no server was available, returns -1 
+     */
+    public RequestResult getNextServer(BigInteger inputFactor) {
         int MAX_TRIES = 3;
         if (instances.size() == 0) {
             System.out.println("There are no servers available");
-            return null;
+            return new RequestResult();
         }
 
         for (int i = 0; i < MAX_TRIES; ++i) {
-            lastIndex = (++lastIndex) % instances.size();
-            String newId = instanceIds.get(lastIndex);
-            WebServer server = instances.get(newId);
-
+            String newId = "none";
             try {
-                if (server.getInstance().getState().getCode() != RUNNING_CODE) {
-                    System.out.println(
-                            "Server '" + server.getInstance().getInstanceId() + "' isn't running");
-                } else
-                    return server;
+                lastIndex = (++lastIndex) % instances.size();
+                newId = instanceIds.get(lastIndex);
+                WebServer server = instances.get(newId);
+
+                // the server might be already lock and marked for removal or
+                // still be in its initialization period or not running 
+                int requestIndex = server.addRequestIfUnlocked(inputFactor);
+                int statusCode = server.getInstance().getState().getCode();
+                System.out.println("This server is " + server.getAge() + " seconds old");
+
+                if (requestIndex == -1)
+                    continue;
+                if (server.getAge() <= GRACE_PERIOD) {
+                    System.out.println("Server is " + server.getAge()
+                            + " seconds old (still in grace period)");
+                    continue;
+                }
+                if (statusCode != RUNNING_CODE) {
+                    System.out.println("Server " + newId + " isn't running");
+                    continue;
+                } else {
+                    return new RequestResult(server, requestIndex);
+                }
             } catch (Exception e) {
-                System.out.println("Server " + server.getInstance() + " is down");
+                e.printStackTrace();
             }
         }
+        return new RequestResult();
 
-        return null;
     }
 
     public void increaseGroup(int instancesNum) {
@@ -122,11 +143,15 @@ public class InstanceManager {
     }
 
     public void decreaseGroup(int instancesNum) {
-        throw new UnsupportedOperationException();
+        int removedRequests = 0;
 
-        /*for (String instanceId : instanceIds) {
+        //TODO: find num servers without requests and remove them atomically 
+        /* for (String instanceId : instanceIds) {
+            WebServer server = instances.get(instanceId);
+            if (server.numPendingRequests() 
             // find server without requests and remove them
         }*/
+        
     }
 
     public void decreaseGroup(String instanceId) {
@@ -172,13 +197,13 @@ public class InstanceManager {
                 if (instance.getInstanceId().equals(localInstanceId))
                     continue;
 
+                int instanceCode = instance.getState().getCode();
                 if (!instances.containsKey(instance.getInstanceId())) {
                     WebServer server = new WebServer(instance);
 
                     // only add if it's running
                     // NOTE: in the future something should be done with stopped(80) instances
 
-                    int instanceCode = instance.getState().getCode();
                     if (instanceCode == RUNNING_CODE) {
                         // move it from pending to running
                         if (pendingInstances.containsKey(instance.getInstanceId())) {
@@ -191,6 +216,12 @@ public class InstanceManager {
                         printInstanceIds();
                     } else if (instanceCode == PENDING_CODE) {
                         pendingInstances.put(instance.getInstanceId(), server);
+                    }
+                } else {
+                    if (instanceCode != RUNNING_CODE) {
+                        System.out.println("Instance "+instance.getInstanceId()+" stopped working");
+                        instanceIds.remove(instance.getInstanceId());
+                        instances.remove(instance.getInstanceId());
                     }
                 }
             }
@@ -223,15 +254,15 @@ public class InstanceManager {
         }
 
         // Take the running instances out of the pending list
-        for (String instanceId : pendingInstances.keySet()) {
+        /*  for (String instanceId : pendingInstances.keySet()) {
             boolean foundServer = false;
-
+        
             for (Reservation reservation : reservations) {
-
+        
                 // ignore this instance
                 if (instanceId.equals(localInstanceId))
                     continue;
-
+        
                 for (Instance instance : reservation.getInstances()) {
                     if (instance.equals(instanceId)) {
                         InstanceState state = instance.getState();
@@ -242,17 +273,17 @@ public class InstanceManager {
                             pendingInstances.remove(instanceId);
                             instances.put(instanceId, server);
                             instanceIds.add(instanceId);
-
+        
                             foundServer = true;
                             break;
                         }
                     }
                 }
-
+        
                 if (foundServer)
                     break;
             }
-
-        }
+        
+        }*/
     }
 }

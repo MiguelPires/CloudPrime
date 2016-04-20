@@ -26,8 +26,7 @@ public class AutoScaler
     //  this is measured in milliseconds
     private static final int CHECK_PERIOD = 4000;
     // this is measured in seconds
-    private static final int COOLDOWN_PERIOD = 240;
-    //
+    private static final int COOLDOWN_PERIOD = 180;
 
     private int lastScale;
 
@@ -87,16 +86,17 @@ public class AutoScaler
                     // for debug purposes
                     System.out.print("Points: ");
                     for (Datapoint point : dataPoints) {
-                        System.out.print(" " + point.getAverage());
+                        System.out.print(" " + point.getAverage() + "%");
                     }
                     System.out.println("");
 
-                    Datapoint point = dataPoints.get(dataPoints.size() - 1);
-                    System.out.println("Current CPU load: " + point.getAverage());
+                    Datapoint latestPoint = dataPoints.get(dataPoints.size() - 1);
+                    System.out.println("Current CPU load: " + latestPoint.getAverage() + "%");
 
-                    if (point.getAverage() > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
+                    if (latestPoint.getAverage() > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
                         instanceManager.increaseGroup(1);
-                    } else if (point.getAverage() < MIN_AVG_CPU && clusterSize > MIN_INSTANCES) {
+                    } else if (latestPoint.getAverage() < MIN_AVG_CPU
+                            && clusterSize > MIN_INSTANCES) {
                         instanceManager.decreaseGroup(server.getInstance().getInstanceId());
                     }
                 }

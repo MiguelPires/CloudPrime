@@ -22,6 +22,11 @@ public class RequestHandler
     }
 
     public void handle(HttpExchange exchange) throws IOException {
+        String response = "";
+        BigInteger inputBigInt;
+        WebServer server = null;
+        int requestIndex = -1;
+
         try {
             String path = exchange.getRequestURI().toString();
 
@@ -34,21 +39,24 @@ public class RequestHandler
             String inputNumber = exchange.getRequestURI().toString().replace("/f.html?n=", "");
             System.out.println("Request: " + exchange.getRequestURI());
 
+
             try {
-                new BigInteger(inputNumber);
+                inputBigInt = new BigInteger(inputNumber);
             } catch (NumberFormatException e) {
-                String response = "This '" + inputNumber + "' is not a number";
+                response = "This '" + inputNumber + "' is not a number";
                 System.out.println(response);
                 exchange.sendResponseHeaders(400, response.length());
-                OutputStream outStream = exchange.getResponseBody();
-                outStream.write(response.getBytes());
-                outStream.close();
                 return;
             }
 
-            WebServer server = instanceManager.getNextServer();
-            if (server == null)
-                return;
+            RequestResult result = instanceManager.getNextServer(inputBigInt);
+            
+            if (result == null || !result.isResponseValid())
+                throw new NoAvailableServerException(
+                        "There is no instance available to serve that request");
+
+            requestIndex = result.getRequestIndex();
+            server = result.getServer();
             
             String serverIp = server.getInstance().getPublicIpAddress();
             System.out.println(
@@ -56,7 +64,6 @@ public class RequestHandler
 
             URL url = new URL("http://" + serverIp + ":8000" + path);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            String response = "";
 
             // read the response
             int responseCode = connection.getResponseCode();
@@ -67,15 +74,17 @@ public class RequestHandler
             // forward the webserver's response
             System.out.println("Forwarding response from server.");
             exchange.sendResponseHeaders(responseCode, response.length());
+        } catch (Exception e) {
+            exchange.sendResponseHeaders(404, e.getMessage().length());
+            response = e.toString();
+        } finally {
             OutputStream outStream = exchange.getResponseBody();
             outStream.write(response.getBytes());
             outStream.close();
-        } catch (Exception e) {
-            exchange.sendResponseHeaders(404, e.getMessage().length());
-            OutputStream outStream = exchange.getResponseBody();
-            outStream.write(e.getMessage().getBytes());
-            outStream.close();
-            System.out.println(e.getMessage());
+
+            if (server != null && requestIndex != -1) {
+                server.removeRequest(requestIndex);
+            }
         }
     }
 }

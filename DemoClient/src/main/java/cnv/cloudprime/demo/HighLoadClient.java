@@ -11,7 +11,7 @@ import java.net.URL;
 
 public class HighLoadClient {
 
-    public static void main(String[] args) throws MalformedURLException {
+    public static void main(String[] args) throws MalformedURLException, InterruptedException {
         BigInteger number = BigInteger.valueOf(11566174444L);
 
         final URL newUserUrl = new URL("http://localhost/f.html?n=" + number.toString(10));
@@ -30,12 +30,19 @@ public class HighLoadClient {
                 if (responseCode != 200) {
                     System.out.println("Responded with '" + responseCode + "' to number " + number);
                     System.out.println("Message: " + line);
+                    Thread.sleep(4000);
                 } else {
                     System.out.println("Responded with '" + line + "'");
                 }
             } catch (IOException e) {
                 e.printStackTrace();
                 System.out.println("Request failed");
+                Thread.sleep(4000);
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                Thread.sleep(4000);
+
             }
         }
     }

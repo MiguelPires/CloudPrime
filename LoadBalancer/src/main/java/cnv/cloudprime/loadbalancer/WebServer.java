@@ -1,9 +1,9 @@
 package cnv.cloudprime.loadbalancer;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -11,23 +11,26 @@ import com.amazonaws.services.ec2.model.Instance;
 
 public class WebServer {
     private Instance instance;
-    private List<BigInteger> pendingRequests = new ArrayList<BigInteger>();
-    private Date launchTime = new Date();
+    private ConcurrentHashMap<Long, BigInteger> pendingRequests = new ConcurrentHashMap<Long, BigInteger>();
+    private AtomicLong requestId = new AtomicLong();
+    private Date launchTime;
     private Lock serverLock = new ReentrantLock();
 
     public WebServer(Instance instance) {
         this.instance = instance;
+        launchTime = instance.getLaunchTime();
     }
 
     /*
      * Add a request to the server if the lock is not acquired
      * Returns the request index or -1 if the request couldn't be placed
      */
-    public synchronized int addRequestIfUnlocked(BigInteger request) {
+    public synchronized long addRequestIfUnlocked(BigInteger request) {
         try {
             if (serverLock.tryLock()) {
-                pendingRequests.add(request);
-                return pendingRequests.size() - 1;
+                long id = requestId.incrementAndGet();
+                pendingRequests.put(id, request);
+                return id;
             } else
                 return -1;
         } finally {
@@ -38,7 +41,7 @@ public class WebServer {
     /*
      * Removes the pending request at the specified index 
      */
-    public synchronized void removeRequest(int requestIndex) {
+    public synchronized void removeRequest(long requestIndex) {
         pendingRequests.remove(requestIndex);
     }
 

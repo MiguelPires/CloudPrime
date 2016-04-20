@@ -2,28 +2,28 @@ package cnv.cloudprime.loadbalancer;
 
 public class RequestResult {
     private WebServer server;
-    private int requestIndex;
+    private long requestId;
 
-    public RequestResult(WebServer server, int requestIndex) {
+    public RequestResult(WebServer server, long requestIndex) {
         this.server = server;
-        this.requestIndex = requestIndex;
+        this.requestId = requestIndex;
     }
 
     public RequestResult() {
         this.server = null;
-        this.requestIndex = -1;
+        this.requestId = -1;
     }
 
     public WebServer getServer() {
         return server;
     }
 
-    public int getRequestIndex() {
-        return requestIndex;
+    public long getRequestIndex() {
+        return requestId;
     }
 
     public boolean isResponseValid() {
-        return server != null && requestIndex != -1;
+        return server != null && requestId != -1;
     }
 }
 

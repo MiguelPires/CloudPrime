@@ -12,6 +12,7 @@ import java.net.URL;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
+@SuppressWarnings("restriction")
 public class RequestHandler
         implements HttpHandler {
 
@@ -25,7 +26,7 @@ public class RequestHandler
         String response = "";
         BigInteger inputBigInt;
         WebServer server = null;
-        int requestIndex = -1;
+        long requestIndex = -1;
 
         try {
             String path = exchange.getRequestURI().toString();
@@ -39,7 +40,6 @@ public class RequestHandler
             String inputNumber = exchange.getRequestURI().toString().replace("/f.html?n=", "");
             System.out.println("Request: " + exchange.getRequestURI());
 
-
             try {
                 inputBigInt = new BigInteger(inputNumber);
             } catch (NumberFormatException e) {
@@ -50,14 +50,14 @@ public class RequestHandler
             }
 
             RequestResult result = instanceManager.getNextServer(inputBigInt);
-            
+
             if (result == null || !result.isResponseValid())
                 throw new NoAvailableServerException(
                         "There is no instance available to serve that request");
 
             requestIndex = result.getRequestIndex();
             server = result.getServer();
-            
+
             String serverIp = server.getInstance().getPublicIpAddress();
             System.out.println(
                     "Forwarding request to server " + server.getInstance().getInstanceId());

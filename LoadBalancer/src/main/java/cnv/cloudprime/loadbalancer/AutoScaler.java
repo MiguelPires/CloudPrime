@@ -1,6 +1,7 @@
 package cnv.cloudprime.loadbalancer;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -83,6 +84,9 @@ public class AutoScaler
                 List<Datapoint> dataPoints = result.getDatapoints();
 
                 if (dataPoints != null && !dataPoints.isEmpty()) {
+                    Collections.sort(dataPoints,
+                            (a, b) -> a.getTimestamp().compareTo(b.getTimestamp()));
+
                     // for debug purposes
                     System.out.print("Points: ");
                     for (Datapoint point : dataPoints) {
@@ -91,13 +95,14 @@ public class AutoScaler
                     System.out.println("");
 
                     Datapoint latestPoint = dataPoints.get(dataPoints.size() - 1);
+
                     System.out.println("Current CPU load: " + latestPoint.getAverage() + "%");
 
                     if (latestPoint.getAverage() > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
                         instanceManager.increaseGroup(1);
                     } else if (latestPoint.getAverage() < MIN_AVG_CPU
                             && clusterSize > MIN_INSTANCES) {
-                        instanceManager.decreaseGroup(server.getInstance().getInstanceId());
+                        instanceManager.decreaseGroup(1);
                     }
                 }
             }

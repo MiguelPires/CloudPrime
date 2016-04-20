@@ -4,6 +4,7 @@ import java.net.InetSocketAddress;
 
 import com.sun.net.httpserver.HttpServer;
 
+@SuppressWarnings("restriction")
 public class LoadBalancer {
 
     public static void main(String[] args) throws Exception {

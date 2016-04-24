@@ -1,7 +1,7 @@
 package cnv.cloudprime.webserver;
 
 import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,7 +13,7 @@ import BIT.highBIT.Routine;
 
 public class Instrumentation {
 
-    // can't use diamong operator => 1.4
+    // can't use diamond operator => 1.4
     private static ConcurrentHashMap metrics = new ConcurrentHashMap();
 
     public static void main(String[] args) {
@@ -32,10 +32,10 @@ public class Instrumentation {
      */
     public static synchronized void instrument(String filename, String methodName) {
         File file = new File(filename);
-
+        
         if (filename.endsWith(".class")) {
             String absolutePathFile = file.getAbsolutePath();
-            System.out.println("The file's full path is: " + absolutePathFile);
+            System.out.println("Instrumenting the class: " + absolutePathFile);
 
             ClassInfo ci = new ClassInfo(absolutePathFile);
             Vector<?> routines = ci.getRoutines();
@@ -43,7 +43,6 @@ public class Instrumentation {
             for (Enumeration<?> e = routines.elements(); e.hasMoreElements();) {
                 Routine routine = (Routine) e.nextElement();
                 if (routine.getMethodName().equals(methodName)) {
-
                     routine.addBefore("cnv/cloudprime/webserver/Instrumentation", "incrStackDepth",
                             "");
                     routine.addAfter("cnv/cloudprime/webserver/Instrumentation", "decrStackDepth",
@@ -64,6 +63,8 @@ public class Instrumentation {
                 }
             }
             ci.write(filename);
+        } else {
+            System.out.println("Invalid filename. Isn't a .class file");
         }
     }
 
@@ -78,7 +79,7 @@ public class Instrumentation {
     /*
      *  Stack Depth Metric - Decrements the stack depth
      */
-    public static synchronized void decrStackDepth(String __) throws FileNotFoundException {
+    public static synchronized void decrStackDepth(String __) throws IOException {
         Metrics threadMetrics = getOrCreate();
         threadMetrics.decrStackDepth(__);
     }
@@ -97,14 +98,6 @@ public class Instrumentation {
     public static synchronized void incrCall(String __) {
         Metrics threadMetrics = getOrCreate();
         threadMetrics.incrCall(__);
-    }
-
-    /*
-     *  Logs every metric to disk after the execution ends 
-     */
-    public static synchronized void flushMetrics() throws FileNotFoundException {
-        Metrics threadMetrics = getOrCreate();
-        threadMetrics.flushMetrics();
     }
 
     private static Metrics getOrCreate() {

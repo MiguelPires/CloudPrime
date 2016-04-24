@@ -15,6 +15,7 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.DescribeInstancesResult;
+import com.amazonaws.services.ec2.model.IamInstanceProfileSpecification;
 import com.amazonaws.services.ec2.model.Instance;
 import com.amazonaws.services.ec2.model.Reservation;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
@@ -135,11 +136,12 @@ public class InstanceManager {
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
-        runInstancesRequest.withImageId("ami-e4d75b97").withInstanceType("t2.micro").withMinCount(1)
+        runInstancesRequest.withImageId("ami-3c2ea24f").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
                 .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738")
-                .withMonitoring(true);
-
+                .withMonitoring(true).withIamInstanceProfile(new IamInstanceProfileSpecification()
+                        .withName("s3writer"));
+        
         ec2Client.runInstances(runInstancesRequest);
         updateInstances();
     }

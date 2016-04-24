@@ -56,11 +56,7 @@ public class AutoScaler
             int clusterSize =
                 instanceManager.runningInstances() + instanceManager.pendingInstances();
 
-            // if the last scaling activity was too soon ago, we wait  
-            if (new Date().getTime() - lastScale <= 1000 * COOLDOWN_PERIOD) {
-                System.out.println("Cooldown period");
-                continue;
-            }
+
 
             if (clusterSize < MIN_INSTANCES) {
                 instanceManager.increaseGroup(MIN_INSTANCES - clusterSize);
@@ -98,6 +94,12 @@ public class AutoScaler
 
                     System.out.println("Current CPU load: " + latestPoint.getAverage() + "%");
 
+                    // if the last scaling activity was too soon ago, we wait  
+                    if (new Date().getTime() - lastScale <= 1000 * COOLDOWN_PERIOD) {
+                        System.out.println("Cooldown period");
+                        continue;
+                    }
+                    
                     if (latestPoint.getAverage() > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
                         instanceManager.increaseGroup(1);
                     } else if (latestPoint.getAverage() < MIN_AVG_CPU

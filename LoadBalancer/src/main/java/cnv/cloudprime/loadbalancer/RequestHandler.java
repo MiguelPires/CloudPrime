@@ -75,8 +75,9 @@ public class RequestHandler
             System.out.println("Forwarding response from server.");
             exchange.sendResponseHeaders(responseCode, response.length());
         } catch (Exception e) {
-            exchange.sendResponseHeaders(404, e.getMessage().length());
-            response = e.toString();
+            e.printStackTrace();
+            response = e.getMessage();
+            exchange.sendResponseHeaders(404, response.length());
         } finally {
             OutputStream outStream = exchange.getResponseBody();
             outStream.write(response.getBytes());
@@ -85,6 +86,7 @@ public class RequestHandler
             if (server != null && requestIndex != -1) {
                 server.removeRequest(requestIndex);
             }
+            exchange.close();
         }
     }
 }

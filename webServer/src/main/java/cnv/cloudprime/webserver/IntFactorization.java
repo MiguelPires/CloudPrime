@@ -8,26 +8,26 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 
 public class IntFactorization {
+    static final String LOG_FILENAME = "metrics.log";
 
     private BigInteger zero = new BigInteger("0");
     private BigInteger one = new BigInteger("1");
     private BigInteger divisor = new BigInteger("2");
     private ArrayList<BigInteger> factors = new ArrayList<BigInteger>();
-    private boolean firstIter = true;
+
+    private boolean written = false;
+    private BigInteger firstNum = null;
 
     ArrayList<BigInteger> calcPrimeFactors(BigInteger num) throws FileNotFoundException {
-        if (firstIter) {
-            PrintWriter writer = new PrintWriter(new FileOutputStream(new File("fact.log"), true));
-            long threadId = Thread.currentThread().getId();
-            long millis = System.currentTimeMillis();
-
-            writer.write("Thread: " + threadId + " - Time: " + millis + "\n");
-            writer.write("Thread: " + threadId + " - Factor: " + num.toString(10) + "\n");
-            writer.close();
-            firstIter = false;
+        if (firstNum == null) {
+            firstNum = num;
         }
 
         if (num.compareTo(one) == 0) {
+            if (!written) {
+                write(firstNum);
+            }
+
             return factors;
         }
 
@@ -37,5 +37,15 @@ public class IntFactorization {
 
         factors.add(divisor);
         return calcPrimeFactors(num.divide(divisor));
+    }
+
+    private static void write(BigInteger num) throws FileNotFoundException {
+        PrintWriter writer = new PrintWriter(new FileOutputStream(new File(LOG_FILENAME), true));
+        long threadId = Thread.currentThread().getId();
+        long millis = System.currentTimeMillis();
+
+        writer.write("Thread: " + threadId + " - Time: " + millis + "\n");
+        writer.write("Thread: " + threadId + " - Factor: " + num.toString(10) + "\n");
+        writer.close();
     }
 }

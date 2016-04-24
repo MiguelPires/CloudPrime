@@ -1,8 +1,10 @@
 To build the project run:
 	mvn clean install
 
-To instrument the server run:
-	java -cp target/classes cnv.cloudprime.webserver.Instrumentation "target/classes/cnv/cloudprime/webserver/IntFactorization.class"
+To instrument the server (in aws):
+	java -cp target/classes:/home/ec2-user/aws-java-sdk-1.10.71/lib/aws-java-sdk-1.10.71.jar:/home/ec2-user/aws-java-sdk-1.10.71/third-party/lib/* cnv.cloudprime.webserver.Instrumentation target/classes/cnv/cloudprime/webserver/IntFactorization.class
+
+Note that for the previous command to work, the AWS SDK for java must be in the home directory
 
 To run the server:
 	mvn exec:java

@@ -2,6 +2,7 @@ package cnv.cloudprime.loadbalancer;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -23,12 +24,16 @@ import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 
 public class InstanceManager {
     // this is measured in seconds
-    private static final int GRACE_PERIOD = 120;
+    static final int GRACE_PERIOD = 130;
     // instance execution codes 
     public static final int RUNNING_CODE = 16;
     public static final int PENDING_CODE = 0;
+    // how many failed checks the system must see taking action 
+    public static final int HEALTHY_TRESHOLD = 2;
+    // how frequently we check for the instances' health
+    public static final int HEALTH_CHECK_PERIOD = 5000;
 
-    private AmazonEC2Client ec2Client;
+    AmazonEC2Client ec2Client;
     private int lastIndex = 0;
     // list of instance identifiers
     private List<String> instanceIds = new ArrayList<String>();
@@ -136,12 +141,12 @@ public class InstanceManager {
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
-        runInstancesRequest.withImageId("ami-3c2ea24f").withInstanceType("t2.micro").withMinCount(1)
+        runInstancesRequest.withImageId("ami-b63eb0c5").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
                 .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738")
-                .withMonitoring(true).withIamInstanceProfile(new IamInstanceProfileSpecification()
-                        .withName("s3writer"));
-        
+                .withMonitoring(true)
+                .withIamInstanceProfile(new IamInstanceProfileSpecification().withName("s3writer"));
+
         ec2Client.runInstances(runInstancesRequest);
         updateInstances();
     }
@@ -153,10 +158,10 @@ public class InstanceManager {
     public int decreaseGroup(int instancesNum) {
         int removedInstances = 0;
 
-        for (int i = 0; i < instanceIds.size(); ){
+        for (int i = 0; i < instanceIds.size();) {
             String instanceId = instanceIds.get(i);
             WebServer server = instances.get(instanceId);
-            
+
             try {
                 if (server.lockIfIdle()) {
                     decreaseGroup(instanceId);
@@ -212,29 +217,30 @@ public class InstanceManager {
         List<Reservation> reservations = describeInstancesRequest.getReservations();
 
         for (Reservation reservation : reservations) {
-
-            // add new servers to the running/pending lists 
             for (Instance instance : reservation.getInstances()) {
 
-                // ignore this instance
+                // ignore this instance (if it's running in AWS)
                 if (instance.getInstanceId().equals(localInstanceId))
                     continue;
 
                 int instanceCode = instance.getState().getCode();
                 if (!instances.containsKey(instance.getInstanceId())) {
-                    WebServer server = new WebServer(instance);
+                    WebServer server = new WebServer(instance, this);
 
                     // only add if it's running
-                    // NOTE: in the future something should be done with stopped(80) instances
-
                     if (instanceCode == RUNNING_CODE) {
                         // move it from pending to running
                         if (pendingInstances.containsKey(instance.getInstanceId())) {
                             pendingInstances.remove(instance.getInstanceId());
                         }
 
-                        instances.put(instance.getInstanceId(), server);
-                        instanceIds.add(instance.getInstanceId());
+                        try {
+                            server.initHealthChecker();
+                            instances.put(instance.getInstanceId(), server);
+                            instanceIds.add(instance.getInstanceId());
+                        } catch (MalformedURLException e) {
+                            e.printStackTrace();
+                        }
                         System.out.println("Found new server: " + instance.getInstanceId());
                         printInstanceIds();
                     } else if (instanceCode == PENDING_CODE) {
@@ -249,14 +255,14 @@ public class InstanceManager {
                     }
                 }
             }
-
         }
+
         // check if any of the instances are no longer running
         for (String instanceId : instances.keySet()) {
             boolean foundInstance = false;
 
             for (Reservation reservation : reservations) {
-                // ignore this instance
+                // ignore this instance (if the loadbalancer/autoscaler is running in AWS)
                 if (instanceId.equals(localInstanceId))
                     continue;
 

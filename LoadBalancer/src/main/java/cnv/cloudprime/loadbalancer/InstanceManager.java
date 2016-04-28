@@ -23,15 +23,17 @@ import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 
 public class InstanceManager {
-    // this is measured in seconds
-    static final int GRACE_PERIOD = 130;
     // instance execution codes 
     public static final int RUNNING_CODE = 16;
     public static final int PENDING_CODE = 0;
+    
+    // *** System Parameters ***
     // how many failed checks the system must see taking action 
     public static final int HEALTHY_TRESHOLD = 2;
     // how frequently we check for the instances' health
     public static final int HEALTH_CHECK_PERIOD = 5000;
+    // this is measured in seconds
+    static final int GRACE_PERIOD = 130;
 
     AmazonEC2Client ec2Client;
     private int lastIndex = 0;
@@ -54,7 +56,6 @@ public class InstanceManager {
 
             if (s.hasNext()) {
                 localInstanceId += s.next();
-                //System.out.println(s.next());
             }
             s.close();
         }
@@ -216,6 +217,15 @@ public class InstanceManager {
         DescribeInstancesResult describeInstancesRequest = ec2Client.describeInstances();
         List<Reservation> reservations = describeInstancesRequest.getReservations();
 
+        checkForAvailableInstances(reservations);
+        checkForUnavailableInstances(reservations);
+    }
+
+    /*
+     *  Checks for new instances and adds them to running/pending lists
+     *   
+     */
+    private void checkForAvailableInstances(List<Reservation> reservations) {
         for (Reservation reservation : reservations) {
             for (Instance instance : reservation.getInstances()) {
 
@@ -256,7 +266,13 @@ public class InstanceManager {
                 }
             }
         }
+    }
 
+    /*
+     *  Checks if any of the instances we know about were removed
+     *  Removes unavailable instances from the manager's list of instances
+     */
+    private void checkForUnavailableInstances(List<Reservation> reservations) {
         // check if any of the instances are no longer running
         for (String instanceId : instances.keySet()) {
             boolean foundInstance = false;

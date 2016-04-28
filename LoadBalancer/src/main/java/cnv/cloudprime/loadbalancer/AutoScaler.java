@@ -19,6 +19,7 @@ public class AutoScaler
     private InstanceManager instanceManager;
     private GetMetricStatisticsRequest metricsRequest;
 
+    // *** System Parameters ***
     private static final int MIN_INSTANCES = 1;
     private static final int MAX_INSTANCES = 2;
     // these are measured in percentage
@@ -28,6 +29,8 @@ public class AutoScaler
     private static final int CHECK_PERIOD = 4000;
     // this is measured in seconds
     private static final int COOLDOWN_PERIOD = 180;
+    // how many minutes are going into the CPU load average
+    private static final int ANALYSIS_TIME_WINDOW = 2;
 
     private int lastScale;
 
@@ -90,20 +93,35 @@ public class AutoScaler
                     }
                     System.out.println("");
 
-                    Datapoint latestPoint = dataPoints.get(dataPoints.size() - 1);
-
-                    System.out.println("Current CPU load: " + latestPoint.getAverage() + "%");
 
                     // if the last scaling activity was too soon ago, we wait  
                     if (new Date().getTime() - lastScale <= 1000 * COOLDOWN_PERIOD) {
                         System.out.println("Cooldown period");
                         continue;
                     }
-                    
-                    if (latestPoint.getAverage() > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
+
+                    float cummulativeLoad = 0f;
+                    int bottomMinute = dataPoints.size() > ANALYSIS_TIME_WINDOW
+                            ? dataPoints.size() - ANALYSIS_TIME_WINDOW : 0;
+
+                    for (int i = dataPoints.size() - 1; i >= bottomMinute; --i) {
+                        cummulativeLoad += dataPoints.get(i).getAverage();
+                    }
+
+                    float averageLoad;
+                    if (dataPoints.size() > ANALYSIS_TIME_WINDOW) {
+                        averageLoad = cummulativeLoad / (float) ANALYSIS_TIME_WINDOW;
+                    } else {
+                        averageLoad = cummulativeLoad / (float) dataPoints.size();
+                    }
+
+                    System.out
+                            .println("Average CPU load (last " + (dataPoints.size() - bottomMinute)
+                                    + " minutes): " + averageLoad + "%");
+
+                    if (averageLoad > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
                         instanceManager.increaseGroup(1);
-                    } else if (latestPoint.getAverage() < MIN_AVG_CPU
-                            && clusterSize > MIN_INSTANCES) {
+                    } else if (averageLoad < MIN_AVG_CPU && clusterSize > MIN_INSTANCES) {
                         instanceManager.decreaseGroup(1);
                     }
                 }

@@ -26,14 +26,14 @@ public class InstanceManager {
     // instance execution codes 
     public static final int RUNNING_CODE = 16;
     public static final int PENDING_CODE = 0;
-    
+
     // *** System Parameters ***
     // how many failed checks the system must see taking action 
     public static final int HEALTHY_TRESHOLD = 2;
     // how frequently we check for the instances' health
     public static final int HEALTH_CHECK_PERIOD = 5000;
     // this is measured in seconds
-    static final int GRACE_PERIOD = 130;
+    static final int GRACE_PERIOD = 150;
 
     AmazonEC2Client ec2Client;
     private int lastIndex = 0;
@@ -47,6 +47,9 @@ public class InstanceManager {
         new ConcurrentHashMap<String, WebServer>();
     // this instance's id
     String localInstanceId = "";
+    // the regression model that models the distribution of a "cost"
+    // variable (dependent) and a factor variable (independent)
+    private BigIntRegression costModel = new BigIntRegression();
 
     public InstanceManager(String inAWS) throws IOException {
         if (inAWS.equals("true")) {
@@ -78,6 +81,9 @@ public class InstanceManager {
         ec2Client = new AmazonEC2Client(credentials);
         ec2Client.setEndpoint("https://ec2.eu-west-1.amazonaws.com");
 
+        Thread metricsUpdater = new Thread(new MetricsUpdater(this));
+        metricsUpdater.start();
+
         updateInstances();
     }
 
@@ -87,6 +93,66 @@ public class InstanceManager {
 
     public AmazonEC2Client getClient() {
         return ec2Client;
+    }
+
+    public void addDatapoint(BigInteger x, BigInteger y) {
+        costModel.addData(x, y);
+    }
+
+    public BigInteger calculateServerLoad(WebServer server) {
+        Collection<BigInteger> requests = server.getRequests();
+        BigInteger sum = new BigInteger("0");
+
+        for (BigInteger request : requests) {
+            sum = sum.add(request);
+        }
+
+        if (sum.compareTo(BigInteger.ZERO) == 0) {
+            return BigInteger.ZERO;
+        }
+        System.out.println("R-squared: "+costModel.getRSquared());
+
+        return costModel.predict(sum);
+    }
+
+    public RequestResult getNextServerCost(BigInteger inputFactor) {
+        if (instances.size() == 0) {
+            System.out.println("There are no servers available");
+            return new RequestResult();
+        } else if (costModel.getNumberOfPoints().compareTo(new BigInteger("2")) == -1) {
+            // we need at least two data points
+            return getNextServer(inputFactor);
+        }
+
+        BigInteger lowestCost = new BigInteger("-1");
+        WebServer leastBusyServer = null;
+
+        // TODO: there is a bug here
+        for (String instanceId : instanceIds) {
+            WebServer server = instances.get(instanceId);
+            int statusCode = server.getInstance().getState().getCode();
+
+            if (server.getAge() <= GRACE_PERIOD || statusCode != RUNNING_CODE) {
+                System.out.println("Ignoring server: "+instanceId);
+                continue;
+            }
+
+            BigInteger estimatedLoad = calculateServerLoad(server);
+            if (estimatedLoad.compareTo(lowestCost) == -1 || lowestCost.intValue() == -1) {
+                lowestCost = estimatedLoad;
+                leastBusyServer = server;
+            }
+            System.out.println("Server " + server.getInstance().getInstanceId()
+                    + " has load " + estimatedLoad.toString());
+        }
+
+        if (leastBusyServer != null) {
+            System.out.println("Chose server " + leastBusyServer.getInstance().getInstanceId()
+                    + " with load " + lowestCost.toString());
+            long requestIndex = leastBusyServer.addRequestIfUnlocked(inputFactor);
+            return new RequestResult(leastBusyServer, requestIndex);
+        } else
+            return new RequestResult();
     }
 
     /*
@@ -138,11 +204,11 @@ public class InstanceManager {
      *  Adds a certain number of instances
      */
     public void increaseGroup(int instancesNum) {
-        System.out.println("Adding " + instancesNum + " servers");
+        System.out.println("#\tAdding " + instancesNum + " servers");
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
-        runInstancesRequest.withImageId("ami-b63eb0c5").withInstanceType("t2.micro").withMinCount(1)
+        runInstancesRequest.withImageId("ami-7e9b130d").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
                 .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738")
                 .withMonitoring(true)
@@ -184,7 +250,7 @@ public class InstanceManager {
      *  Removes the specified instance from the cluster
      */
     public void decreaseGroup(String instanceId) {
-        System.out.println("Removing server '" + instanceId + "'");
+        System.out.println("#\tRemoving server '" + instanceId + "'");
 
         try {
             TerminateInstancesRequest terminationRequest = new TerminateInstancesRequest();
@@ -207,9 +273,9 @@ public class InstanceManager {
     }
 
     public void printInstanceIds() {
-        System.out.println("Ids:");
+        System.out.println("#\tIds:");
         for (String id : instanceIds) {
-            System.out.println(id);
+            System.out.println("#\t" + id);
         }
     }
 
@@ -251,7 +317,7 @@ public class InstanceManager {
                         } catch (MalformedURLException e) {
                             e.printStackTrace();
                         }
-                        System.out.println("Found new server: " + instance.getInstanceId());
+                        System.out.println("#\tFound new server: " + instance.getInstanceId());
                         printInstanceIds();
                     } else if (instanceCode == PENDING_CODE) {
                         pendingInstances.put(instance.getInstanceId(), server);
@@ -259,7 +325,7 @@ public class InstanceManager {
                 } else {
                     if (instanceCode != RUNNING_CODE) {
                         System.out.println(
-                                "Instance " + instance.getInstanceId() + " stopped working");
+                                "#\tInstance " + instance.getInstanceId() + " stopped working");
                         instanceIds.remove(instance.getInstanceId());
                         instances.remove(instance.getInstanceId());
                     }

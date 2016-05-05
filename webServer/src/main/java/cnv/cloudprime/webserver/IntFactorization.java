@@ -8,7 +8,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 
 public class IntFactorization {
-    static final String LOG_FILENAME = "metrics.log";
+    static final String LOG_FILENAME = "metrics";
 
     private BigInteger zero = new BigInteger("0");
     private BigInteger one = new BigInteger("1");
@@ -40,12 +40,13 @@ public class IntFactorization {
     }
 
     private static void write(BigInteger num) throws FileNotFoundException {
-        PrintWriter writer = new PrintWriter(new FileOutputStream(new File(LOG_FILENAME), true));
-        long threadId = Thread.currentThread().getId();
+        PrintWriter writer = new PrintWriter(new FileOutputStream(
+                new File(LOG_FILENAME + "-" + Thread.currentThread().getId() + ".log"), true));
+        /*   long threadId = Thread.currentThread().getId();
         long millis = System.currentTimeMillis();
+        writer.write("Thread: " + threadId + " - Time: " + millis + "\n");*/
 
-        writer.write("Thread: " + threadId + " - Time: " + millis + "\n");
-        writer.write("Thread: " + threadId + " - Factor: " + num.toString(10) + "\n");
+        writer.write("Input:" + num.toString(10) + "\n");
         writer.close();
     }
 }

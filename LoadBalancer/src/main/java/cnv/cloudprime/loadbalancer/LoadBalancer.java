@@ -21,6 +21,7 @@ public class LoadBalancer {
         Thread thread = new Thread(autoscaler);
         thread.start();
         System.out.println("Auto scaler running");
+        
 
         System.out.println("Ctrl-C to terminate load balancer");
         System.in.read();

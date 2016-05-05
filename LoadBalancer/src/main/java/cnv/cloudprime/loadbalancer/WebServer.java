@@ -8,6 +8,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,6 +75,10 @@ public class WebServer {
     public synchronized int numPendingRequests() {
         return pendingRequests.size();
     }
+    
+    public synchronized Collection<BigInteger> getRequests(){
+        return pendingRequests.values();
+    }
 
     public Instance getInstance() {
         return instance;
@@ -119,6 +124,9 @@ public class WebServer {
                     try {
                         HttpURLConnection connection =
                             (HttpURLConnection) checkUrl.openConnection();
+                        connection.setConnectTimeout(0);
+                        connection.setReadTimeout(0);
+                        
                         // read the response
                         responseCode = connection.getResponseCode();
                         InputStream inputStream = connection.getInputStream();
@@ -127,7 +135,7 @@ public class WebServer {
 
                         // the instance is unhealthy
                         if (responseCode != 200 || !factorOutput.equals("3, 3.")) {
-                            throw new WrongFactorOutput(
+                            throw new WrongFactorOutputException(
                                     "Health Check - Wrong output: " + factorOutput);
                         } else if (unhealthyChecks != 0) {
                             unhealthyChecks = 0;

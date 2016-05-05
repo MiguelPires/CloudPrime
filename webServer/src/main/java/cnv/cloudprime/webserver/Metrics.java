@@ -1,9 +1,12 @@
 package cnv.cloudprime.webserver;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Random;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
@@ -19,6 +22,7 @@ public class Metrics {
     private int currentStackDepth = 0;
     private int bytesExecuted = 0;
     private int calls = 0;
+    private Random rand = new Random(System.nanoTime());
 
     public synchronized void incrStackDepth(String __) {
         currentStackDepth++;
@@ -35,17 +39,8 @@ public class Metrics {
         currentStackDepth--;
 
         if (currentStackDepth == 0) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        flushMetrics();
-                        clearMetrics();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }).start();
+            flushMetrics();
+            clearMetrics();
         }
     }
 
@@ -69,23 +64,34 @@ public class Metrics {
      */
     public synchronized void flushMetrics() throws IOException {
         System.out.println("Flushing metrics");
-        File metricsFile = new File(IntFactorization.LOG_FILENAME);
-        PrintWriter writer = new PrintWriter(new FileOutputStream(metricsFile, true));
-        long threadId = Thread.currentThread().getId();
+        File inputFile = new File(OBJECT_NAME + "-" + Thread.currentThread().getId() + ".log");
 
-        if (s3Client == null) {
-            AWSCredentials cred =
-                new ProfileCredentialsProvider("credentials", "default").getCredentials();
-            s3Client = new AmazonS3Client(cred);
+        BufferedReader reader = new BufferedReader(new FileReader(inputFile));
+        String inputLine;
+
+        while ((inputLine = reader.readLine()) != null) {
+            String filename = OBJECT_NAME + "-" + rand.nextLong();
+            File metricsFile = new File(filename);
+            PrintWriter writer = new PrintWriter(new FileOutputStream(metricsFile, true));
+
+            if (s3Client == null) {
+                AWSCredentials cred =
+                    new ProfileCredentialsProvider("credentials", "default").getCredentials();
+                s3Client = new AmazonS3Client(cred);
+            }
+
+            // write metrics
+            writer.write(inputLine+"\n");
+            writer.write("Max depth:" + maxStackDepth + "\n");
+            writer.write("Bytes executed:" + bytesExecuted + "\n");
+            writer.write("Function calls:" + calls + "\n");
+            writer.close();
+
+            s3Client.putObject(new PutObjectRequest(BUCKET_NAME, filename, metricsFile));
+            metricsFile.delete();
+            inputFile.delete();
         }
-
-        // write metrics
-        writer.write("Thread: " + threadId + " - Max depth: " + maxStackDepth + "\n");
-        writer.write("Thread: " + threadId + " - Bytes executed: " + bytesExecuted + "\n");
-        writer.write("Thread: " + threadId + " - Function calls: " + calls + "\n");
-        writer.close();
-
-        s3Client.putObject(new PutObjectRequest(BUCKET_NAME, OBJECT_NAME, metricsFile));
+        reader.close();
     }
 
     /*

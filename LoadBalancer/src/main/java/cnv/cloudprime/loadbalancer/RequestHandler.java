@@ -38,7 +38,6 @@ public class RequestHandler
             }
 
             String inputNumber = exchange.getRequestURI().toString().replace("/f.html?n=", "");
-            System.out.println("Request: " + exchange.getRequestURI());
 
             try {
                 inputBigInt = new BigInteger(inputNumber);
@@ -49,7 +48,7 @@ public class RequestHandler
                 return;
             }
 
-            RequestResult result = instanceManager.getNextServer(inputBigInt);
+            RequestResult result = instanceManager.getNextServerCost(inputBigInt);
 
             if (result == null || !result.isResponseValid())
                 throw new NoAvailableServerException(
@@ -59,12 +58,12 @@ public class RequestHandler
             server = result.getServer();
 
             String serverIp = server.getInstance().getPublicIpAddress();
-            System.out.println(
-                    "Forwarding request to server " + server.getInstance().getInstanceId());
 
             URL url = new URL("http://" + serverIp + ":8000" + path);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
+            connection.setConnectTimeout(0);
+            connection.setReadTimeout(0);
+            
             // read the response
             int responseCode = connection.getResponseCode();
             InputStream inputStream = connection.getInputStream();
@@ -72,7 +71,6 @@ public class RequestHandler
             response += rd.readLine();
 
             // forward the webserver's response
-            System.out.println("Forwarding response from server.");
             exchange.sendResponseHeaders(responseCode, response.length());
         } catch (Exception e) {
             e.printStackTrace();
@@ -84,7 +82,13 @@ public class RequestHandler
             outStream.close();
 
             if (server != null && requestIndex != -1) {
+                // TODO: requests are not being removed correctly
+                // TODO: switch the request array to another (better) structure
+                System.out.println("Removing request");
+                System.out.println("Requests "+server.getRequests().toString());
                 server.removeRequest(requestIndex);
+                System.out.println("Requests "+server.getRequests().toString());
+
             }
             exchange.close();
         }

@@ -27,7 +27,9 @@ public class BigIntRegression {
     /** mean of accumulated y values, used in updating formulas */
     private BigInteger ybar = new BigInteger("0");
 
-
+    /*
+     *  Adds a data point to the model
+     */
     public void addData(final BigInteger x, final BigInteger y) {
         if (n.equals(0)) {
             xbar = x;
@@ -52,6 +54,9 @@ public class BigIntRegression {
         //System.out.println("SumYY is " + sumYY + " and SumXX is " + sumXX);
     }
 
+    /*
+     *  Returns the slope (inclination) of the model's line
+     */
     public BigInteger getSlope() {
         if (n.compareTo(new BigInteger("2")) == -1) {
             return new BigInteger("-1"); //not enough data
@@ -66,20 +71,55 @@ public class BigIntRegression {
         return sumXY.divide(sumXX);
     }
 
+    /*
+     *  Returns the prediction for a certain value (returns the y for a certain x)
+     */
     public BigInteger predict(final BigInteger x) {
         final BigInteger b1 = getSlope();
         return getIntercept(b1).add(b1.multiply(x));
     }
 
+    /*
+     *  Returns the number of datapoints
+     */
     public BigInteger getNumberOfPoints() {
         return n;
     }
 
+    /*
+     *  Returns the intercept of the slope
+     */
     private BigInteger getIntercept(final BigInteger slope) {
         if (n.compareTo(new BigInteger("2")) == -1)
             return new BigInteger("-1");
         else
             return sumY.subtract(slope.multiply(sumX)).divide(n);
+    }
+
+    /*
+     * Computes R-squared where R is Pearson's correlation coefficient
+     */
+    public double getRSquared() {
+        BigInteger ssto = getTotalSumSquares();
+        BigInteger[] parts = ssto.subtract(getSumSquaredErrors()).divideAndRemainder(ssto);
+        return new Double(parts[0].toString() + "." + parts[1].toString());
+    }
+
+    /*
+     * Returns the sum of squared deviations of the y values about their mean.
+     */
+    public BigInteger getTotalSumSquares() {
+        if (n.compareTo(new BigInteger("2")) == -1) {
+            return new BigInteger("-1");
+        }
+        return sumYY;
+    }
+
+    /*
+     * Returns the sum of squared errors of the model
+     */
+    public BigInteger getSumSquaredErrors() {
+        return BigInteger.ZERO.max(sumYY.subtract(divideWithRound(sumXY.multiply(sumXY), sumXX)));
     }
 
     /*

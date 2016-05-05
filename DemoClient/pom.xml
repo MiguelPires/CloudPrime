@@ -28,7 +28,7 @@
 				</execution>
 			</executions>
 			<configuration>
-				<mainClass>cnv.cloudprime.demo.HighLoadClient</mainClass>
+				<mainClass>cnv.cloudprime.demo.SemiprimesClient</mainClass>
 			</configuration>
 		</plugin>
 	</plugins>

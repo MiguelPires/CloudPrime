@@ -42,11 +42,9 @@ public class IntFactorization {
     private static void write(BigInteger num) throws FileNotFoundException {
         PrintWriter writer = new PrintWriter(new FileOutputStream(
                 new File(LOG_FILENAME + "-" + Thread.currentThread().getId() + ".log"), true));
-        /*   long threadId = Thread.currentThread().getId();
-        long millis = System.currentTimeMillis();
-        writer.write("Thread: " + threadId + " - Time: " + millis + "\n");*/
 
-        writer.write("Input:" + num.toString(10) + "\n");
+        writer.write("Input:" + num.toString() + "\n");
         writer.close();
+
     }
 }

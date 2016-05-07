@@ -2,12 +2,15 @@ package cnv.cloudprime.webserver;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Random;
 
+import com.amazonaws.AmazonClientException;
+import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3Client;
@@ -63,13 +66,18 @@ public class Metrics {
      *  Returns the time at which the file was written
      */
     public synchronized void flushMetrics() throws IOException {
-        System.out.println("Flushing metrics");
         File inputFile = new File(OBJECT_NAME + "-" + Thread.currentThread().getId() + ".log");
 
         BufferedReader reader = new BufferedReader(new FileReader(inputFile));
         String inputLine;
 
         while ((inputLine = reader.readLine()) != null) {
+            // ignore the health check
+            if (inputLine.contains("Input:9")) {
+                inputFile.delete();
+                break;
+            }
+            
             String filename = OBJECT_NAME + "-" + rand.nextLong();
             File metricsFile = new File(filename);
             PrintWriter writer = new PrintWriter(new FileOutputStream(metricsFile, true));
@@ -81,16 +89,18 @@ public class Metrics {
             }
 
             // write metrics
-            writer.write(inputLine+"\n");
+            writer.write(inputLine + "\n");
             writer.write("Max depth:" + maxStackDepth + "\n");
             writer.write("Bytes executed:" + bytesExecuted + "\n");
             writer.write("Function calls:" + calls + "\n");
             writer.close();
 
-            s3Client.putObject(new PutObjectRequest(BUCKET_NAME, filename, metricsFile));
+            s3Client.putObject(
+                    new PutObjectRequest(BUCKET_NAME + "-training", filename, metricsFile));
             metricsFile.delete();
             inputFile.delete();
         }
+        System.out.println("Flushing metrics");
         reader.close();
     }
 

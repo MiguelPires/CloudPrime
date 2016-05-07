@@ -49,8 +49,10 @@ public class InstanceManager {
     String localInstanceId = "";
     // the regression model that models the distribution of a "cost"
     // variable (dependent) and a factor variable (independent)
-    private BigIntRegression costModel = new BigIntRegression();
-
+    BigIntRegression costModel = new BigIntRegression();
+    //
+    BigIntRegression timeModel = new BigIntRegression();
+    
     public InstanceManager(String inAWS) throws IOException {
         if (inAWS.equals("true")) {
             URL url = new URL("http://169.254.169.254/latest/meta-data/instance-id");
@@ -95,8 +97,14 @@ public class InstanceManager {
         return ec2Client;
     }
 
-    public void addDatapoint(BigInteger x, BigInteger y) {
+    public void addCostDatapoint(BigInteger x, BigInteger y) {
         costModel.addData(x, y);
+    }
+    
+
+    public void addTimeDatapoint(BigInteger x, BigInteger y) {
+        timeModel.addData(x, y);
+        
     }
 
     public BigInteger calculateServerLoad(WebServer server) {
@@ -110,30 +118,31 @@ public class InstanceManager {
         if (sum.compareTo(BigInteger.ZERO) == 0) {
             return BigInteger.ZERO;
         }
-        System.out.println("R-squared: "+costModel.getRSquared());
+
+        if (costModel.getNumberOfPoints().compareTo(new BigInteger("2")) == 1)
+            System.out.println("R-squared: " + costModel.getRSquared());
 
         return costModel.predict(sum);
     }
 
-    public RequestResult getNextServerCost(BigInteger inputFactor) {
+    public RequestResult getServer_CostBased(BigInteger inputFactor) {
         if (instances.size() == 0) {
             System.out.println("There are no servers available");
             return new RequestResult();
         } else if (costModel.getNumberOfPoints().compareTo(new BigInteger("2")) == -1) {
             // we need at least two data points
-            return getNextServer(inputFactor);
+            return getServer_RoundRobin(inputFactor);
         }
 
         BigInteger lowestCost = new BigInteger("-1");
         WebServer leastBusyServer = null;
 
-        // TODO: there is a bug here
         for (String instanceId : instanceIds) {
             WebServer server = instances.get(instanceId);
             int statusCode = server.getInstance().getState().getCode();
 
             if (server.getAge() <= GRACE_PERIOD || statusCode != RUNNING_CODE) {
-                System.out.println("Ignoring server: "+instanceId);
+                System.out.println("Ignoring server: " + instanceId);
                 continue;
             }
 
@@ -142,8 +151,8 @@ public class InstanceManager {
                 lowestCost = estimatedLoad;
                 leastBusyServer = server;
             }
-            System.out.println("Server " + server.getInstance().getInstanceId()
-                    + " has load " + estimatedLoad.toString());
+            System.out.println("Server " + server.getInstance().getInstanceId() + " has load "
+                    + estimatedLoad.toString());
         }
 
         if (leastBusyServer != null) {
@@ -159,7 +168,7 @@ public class InstanceManager {
      *  Returns a request index and a server (as an output parameter)
      *  If no server was available, returns -1 
      */
-    public RequestResult getNextServer(BigInteger inputFactor) {
+    public RequestResult getServer_RoundRobin(BigInteger inputFactor) {
         if (instances.size() == 0) {
             System.out.println("There are no servers available");
             return new RequestResult();
@@ -208,7 +217,7 @@ public class InstanceManager {
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
-        runInstancesRequest.withImageId("ami-7e9b130d").withInstanceType("t2.micro").withMinCount(1)
+        runInstancesRequest.withImageId("ami-47e66d34").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
                 .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738")
                 .withMonitoring(true)
@@ -253,6 +262,7 @@ public class InstanceManager {
         System.out.println("#\tRemoving server '" + instanceId + "'");
 
         try {
+            instances.get(instanceId).shutdown();
             TerminateInstancesRequest terminationRequest = new TerminateInstancesRequest();
             terminationRequest.withInstanceIds(instanceId);
             ec2Client.terminateInstances(terminationRequest);
@@ -303,8 +313,8 @@ public class InstanceManager {
                 if (!instances.containsKey(instance.getInstanceId())) {
                     WebServer server = new WebServer(instance, this);
 
-                    // only add if it's running
-                    if (instanceCode == RUNNING_CODE) {
+                    // only add if it's running && out of the grace period
+                    if (instanceCode == RUNNING_CODE && server.getAge() > GRACE_PERIOD) {
                         // move it from pending to running
                         if (pendingInstances.containsKey(instance.getInstanceId())) {
                             pendingInstances.remove(instance.getInstanceId());

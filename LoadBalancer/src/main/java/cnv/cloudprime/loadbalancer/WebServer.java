@@ -21,13 +21,23 @@ import com.amazonaws.services.ec2.model.RebootInstancesRequest;
 
 public class WebServer {
     private Instance instance;
+    // the requests that are currently being factored
     private ConcurrentHashMap<Long, BigInteger> pendingRequests =
         new ConcurrentHashMap<Long, BigInteger>();
+    // the times in which the requests began running
+    private ConcurrentHashMap<Long, Long> requestingTimes = new ConcurrentHashMap<>();
+    //
     private AtomicLong requestId = new AtomicLong();
+    // the launch time of this instance
     private Date launchTime;
+    // necessary to ensure that no requests are assigned to this
+    // server while it's being terminated
     private Lock serverLock = new ReentrantLock();
+    // this instance's health checker
     private Thread healthChecker;
+    // how many times the health check failed consecutively
     private int unhealthyChecks = 0;
+    //
     private InstanceManager instanceManager;
 
     public WebServer(Instance instance, InstanceManager manager) {
@@ -54,6 +64,7 @@ public class WebServer {
             if (serverLock.tryLock()) {
                 long id = requestId.incrementAndGet();
                 pendingRequests.put(id, request);
+                requestingTimes.put(id, new Date().getTime());
                 return id;
             } else
                 return -1;
@@ -67,6 +78,7 @@ public class WebServer {
      */
     public synchronized void removeRequest(long requestIndex) {
         pendingRequests.remove(requestIndex);
+        requestingTimes.remove(requestIndex);
     }
 
     /*
@@ -75,8 +87,8 @@ public class WebServer {
     public synchronized int numPendingRequests() {
         return pendingRequests.size();
     }
-    
-    public synchronized Collection<BigInteger> getRequests(){
+
+    public synchronized Collection<BigInteger> getRequests() {
         return pendingRequests.values();
     }
 
@@ -104,6 +116,10 @@ public class WebServer {
             return false;
     }
 
+    public synchronized void shutdown() {
+        healthChecker.interrupt();
+    }
+
     public class HealthChecker
             implements Runnable {
 
@@ -114,9 +130,10 @@ public class WebServer {
             checkUrl = new URL("http://" + serverIp + ":8000/f.html?n=9");
         }
 
+
         @Override
         public void run() {
-            while (true) {
+            while (!Thread.interrupted()) {
                 if (getAge() >= InstanceManager.GRACE_PERIOD) {
                     int responseCode;
                     String factorOutput;
@@ -126,7 +143,7 @@ public class WebServer {
                             (HttpURLConnection) checkUrl.openConnection();
                         connection.setConnectTimeout(0);
                         connection.setReadTimeout(0);
-                        
+
                         // read the response
                         responseCode = connection.getResponseCode();
                         InputStream inputStream = connection.getInputStream();
@@ -147,7 +164,7 @@ public class WebServer {
                                 + unhealthyChecks);
 
                         if (unhealthyChecks >= InstanceManager.HEALTHY_TRESHOLD) {
-                            System.out.println("Rebooting instance");
+                            System.out.println("Rebooting instance " + instance.getInstanceId());
 
                             // reset the server's state
                             unhealthyChecks = 0;

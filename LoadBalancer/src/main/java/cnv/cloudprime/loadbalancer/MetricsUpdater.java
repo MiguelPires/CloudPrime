@@ -34,6 +34,8 @@ public class MetricsUpdater
 
     @Override
     public void run() {
+        trainCostModel();
+        trainTimeModel();
 
         while (true) {
             ListObjectsRequest listObjectsRequest =
@@ -44,10 +46,6 @@ public class MetricsUpdater
                 objectListing = s3Client.listObjects(listObjectsRequest);
                 listObjectsRequest.setMarker(objectListing.getNextMarker());
             } while (objectListing.isTruncated());
-
-         /*  if (objectListing.getObjectSummaries().size() != 0)
-                System.out.println("There are " + objectListing.getObjectSummaries().size()
-                        + " metric logs pending");*/
 
             for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
 
@@ -94,7 +92,7 @@ public class MetricsUpdater
                     // compute the average of the values
                     metricBigInt =
                         BigIntRegression.divideWithRound(metricBigInt, new BigInteger("3"));
-                    manager.addDatapoint(inputBigInt, metricBigInt);
+                    manager.addCostDatapoint(inputBigInt, metricBigInt);
 
                     objectData.close();
                 } catch (IOException e) {
@@ -110,6 +108,139 @@ public class MetricsUpdater
                 Thread.sleep(UPDATE_PERIOD);
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    private void trainCostModel() {
+        ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
+                .withBucketName(BUCKET_NAME + "-training").withPrefix(OBJECT_NAME);
+        ObjectListing objectListing;
+
+        do {
+            objectListing = s3Client.listObjects(listObjectsRequest);
+            listObjectsRequest.setMarker(objectListing.getNextMarker());
+        } while (objectListing.isTruncated());
+
+        System.out.println("Training cost model with " + objectListing.getObjectSummaries().size()
+                + " data points");
+
+        for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
+            InputStream objectData = null;
+            try {
+                S3Object object = s3Client.getObject(
+                        new GetObjectRequest(BUCKET_NAME + "-training", objectSummary.getKey()));
+                objectData = object.getObjectContent();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(objectData));
+
+                String metricLine;
+                BigInteger metricBigInt = new BigInteger("0");
+                BigInteger inputBigInt = new BigInteger("0");
+                boolean invalidFile = false;
+
+                for (int iter = 0; (metricLine = reader.readLine()) != null && iter < 4; ++iter) {
+                    if ((iter == 0 && !metricLine.contains("Input:"))
+                            || (iter == 1 && !metricLine.contains("Max depth:"))
+                            || (iter == 2 && !metricLine.contains("Bytes executed:"))
+                            || (iter == 3 && !metricLine.contains("Function calls:"))) {
+                        // validate metrics file
+                        invalidFile = true;
+                        break;
+                    }
+
+                    if (iter == 0) {
+                        String inputNumber = metricLine.substring(metricLine.indexOf(":") + 1);
+                        inputBigInt = new BigInteger(inputNumber);
+                    } else {
+                        String metricNumber = metricLine.substring(metricLine.indexOf(":") + 1);
+                        metricBigInt = metricBigInt.add(new BigInteger(metricNumber));
+                    }
+                }
+
+                // ignore invalid file
+                if (invalidFile) {
+                    System.out.println("Deleted invalid file");
+                    continue;
+                }
+
+                metricBigInt = BigIntRegression.divideWithRound(metricBigInt, new BigInteger("3"));
+                manager.addCostDatapoint(inputBigInt, metricBigInt);
+            } catch (IOException e) {
+                e.printStackTrace();
+                continue;
+            } finally {
+                if (objectData != null) {
+                    try {
+                        objectData.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
+
+    private void trainTimeModel() {
+        ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
+                .withBucketName(BUCKET_NAME + "-timing").withPrefix(OBJECT_NAME);
+        ObjectListing objectListing;
+
+        do {
+            objectListing = s3Client.listObjects(listObjectsRequest);
+            listObjectsRequest.setMarker(objectListing.getNextMarker());
+        } while (objectListing.isTruncated());
+
+        System.out.println("Training timing model with " + objectListing.getObjectSummaries().size()
+                + " data points");
+
+        for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
+            InputStream objectData = null;
+            try {
+                S3Object object = s3Client.getObject(
+                        new GetObjectRequest(BUCKET_NAME + "-timing", objectSummary.getKey()));
+                objectData = object.getObjectContent();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(objectData));
+
+                String metricLine;
+                BigInteger timeBigInt = new BigInteger("0");
+                BigInteger inputBigInt = new BigInteger("0");
+                boolean invalidFile = false;
+
+                for (int iter = 0; (metricLine = reader.readLine()) != null && iter < 2; ++iter) {
+                    if ((iter == 0 && !metricLine.contains("Input:"))
+                            || (iter == 1 && !metricLine.contains("Time:"))) {
+                        // validate metrics file
+                        invalidFile = true;
+                        break;
+                    }
+
+                    if (iter == 0) {
+                        String inputNumber = metricLine.substring(metricLine.indexOf(":") + 1);
+                        inputBigInt = new BigInteger(inputNumber);
+                    } else {
+                        String timeNumber = metricLine.substring(metricLine.indexOf(":") + 1);
+                        timeBigInt = new BigInteger(timeNumber);
+                    }
+                }
+
+                // ignore invalid file
+                if (invalidFile) {
+                    System.out.println("Deleted invalid file");
+                    continue;
+                }
+
+                manager.addTimeDatapoint(inputBigInt, timeBigInt);
+            } catch (IOException e) {
+                e.printStackTrace();
+                continue;
+            } finally {
+                if (objectData != null) {
+                    try {
+                        objectData.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         }
     }

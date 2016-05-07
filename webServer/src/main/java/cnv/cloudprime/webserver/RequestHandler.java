@@ -43,7 +43,7 @@ public class RequestHandler
 
         // respond to request
         String response = primeFactors.toString().replaceAll("\\[|\\]|", "");
-
+	System.out.println("Response: "+response);
         response += ".";
         exchange.sendResponseHeaders(200, response.length());
         OutputStream outStream = exchange.getResponseBody();

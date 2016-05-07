@@ -23,8 +23,8 @@ public class AutoScaler
     private static final int MIN_INSTANCES = 1;
     private static final int MAX_INSTANCES = 5;
     // these are measured in percentage
-    private static final float MAX_AVG_CPU = 70.0f;
-    private static final float MIN_AVG_CPU = 20.0f;
+    private static final float MAX_CLUSTER_LOAD = 80.0f;
+    private static final float MIN_CLUSTER_LOAD = 30.0f;
     //  this is measured in milliseconds
     private static final int CHECK_PERIOD = 4000;
     // this is measured in seconds
@@ -68,7 +68,6 @@ public class AutoScaler
             }
 
             float serversAvgLoad = 0f;
-            float serversWithData = 0f;
 
             for (WebServer server : instanceManager.getInstances()) {
                 Dimension instanceDimension = new Dimension();
@@ -112,32 +111,33 @@ public class AutoScaler
                     }
 
                     serversAvgLoad += averageLoad;
-                    ++serversWithData;
-
                     System.out.println(
                             "#\tAverage CPU load (last " + (dataPoints.size() - bottomMinute)
                                     + " minutes): " + averageLoad + "%");
                 }
             }
 
-            // if the last scaling activity was too soon ago, we wait  
-            if (lastScale != null
-                    && new Date().getTime() - lastScale <= 1000 * COOLDOWN_PERIOD) {
-                System.out.println("#\tCooldown period");
-                continue;
-            }
-            
-            if (serversWithData != 0) {
-                serversAvgLoad /= serversWithData;
+            // if some server has no datapoints it's still included in the average
+            // as if it has 0% load (probably accurate since the server is in it's grace period)
+            if (instanceManager.getInstances().size() != 0) {
+                serversAvgLoad /= instanceManager.getInstances().size();
 
                 System.out.println("#\tCluster load: " + serversAvgLoad + "%");
-                if (serversAvgLoad > MAX_AVG_CPU && clusterSize < MAX_INSTANCES) {
-                    instanceManager.increaseGroup(1);
-                    lastScale = new Date().getTime();
-                } else if (serversAvgLoad < MIN_AVG_CPU && clusterSize > MIN_INSTANCES) {
-                    instanceManager.decreaseGroup(1);
-                    lastScale = new Date().getTime();
-                }
+
+            }
+            // if the last scaling activity was too soon ago, we wait  
+            if (lastScale != null && new Date().getTime() - lastScale <= 1000 * COOLDOWN_PERIOD) {
+                System.out.println("#\tCooldown period");
+                System.out.println("########");
+                continue;
+            }
+
+            if (serversAvgLoad > MAX_CLUSTER_LOAD && clusterSize < MAX_INSTANCES) {
+                instanceManager.increaseGroup(1);
+                lastScale = new Date().getTime();
+            } else if (serversAvgLoad < MIN_CLUSTER_LOAD && clusterSize > MIN_INSTANCES) {
+                instanceManager.decreaseGroup(1);
+                lastScale = new Date().getTime();
             }
 
             System.out.println("########");

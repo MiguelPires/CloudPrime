@@ -80,3 +80,6 @@ metrics.log
 fact.log
 *.pem 
 credentials
+R.log
+time.log
+

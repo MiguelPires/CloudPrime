@@ -34,8 +34,8 @@ public class MetricsUpdater
 
     @Override
     public void run() {
-        trainCostModel();
-        trainTimeModel();
+        new Thread(() -> {trainCostModel();}).start();
+        new Thread(() -> {trainTimeModel();}).start();
 
         while (true) {
             ListObjectsRequest listObjectsRequest =

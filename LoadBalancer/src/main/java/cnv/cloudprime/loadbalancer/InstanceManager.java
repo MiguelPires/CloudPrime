@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentials;
@@ -52,7 +53,7 @@ public class InstanceManager {
     BigIntRegression costModel = new BigIntRegression();
     //
     BigIntRegression timeModel = new BigIntRegression();
-    
+
     public InstanceManager(String inAWS) throws IOException {
         if (inAWS.equals("true")) {
             URL url = new URL("http://169.254.169.254/latest/meta-data/instance-id");
@@ -100,19 +101,67 @@ public class InstanceManager {
     public void addCostDatapoint(BigInteger x, BigInteger y) {
         costModel.addData(x, y);
     }
-    
+
 
     public void addTimeDatapoint(BigInteger x, BigInteger y) {
         timeModel.addData(x, y);
-        
+
     }
 
-    public BigInteger calculateServerLoad(WebServer server) {
+    /*
+     *              Estimation functions
+     * Returns an estimation of cost/time for the specified server according to the
+     * specified regression model
+     * 
+     */
+
+    // the generic estimation function
+    public BigInteger estimateServerLoad(WebServer server, BigIntRegression model) {
         Collection<BigInteger> requests = server.getRequests();
         BigInteger sum = new BigInteger("0");
 
         for (BigInteger request : requests) {
-            sum = sum.add(request);
+            sum = model.predict(request);
+        }
+
+        if (sum.compareTo(BigInteger.ZERO) == 0) {
+            return BigInteger.ZERO;
+        }
+
+        if (model.getNumberOfPoints().compareTo(new BigInteger("2")) == 1)
+            System.out.println("R-squared: " + model.getRSquared());
+
+        return sum;
+    }
+
+    //  time-based estimation
+    public BigInteger estimateServerTime(WebServer server) {
+        return estimateServerLoad(server, timeModel);
+    }
+
+    //  cost-based estimation
+    public BigInteger estimateServerCost(WebServer server) {
+        return estimateServerLoad(server, costModel);
+    }
+
+    /*
+     * Returns and estimation for the specified server according to the
+     * cost model but discounts requests that are close to completion
+     */
+    public BigInteger estimateServerDiscounted(WebServer server) {
+        Collection<BigInteger> requests = server.getRequests();
+        BigInteger sum = new BigInteger("0");
+
+        for (BigInteger request : requests) {
+            BigInteger costPrediction = costModel.predict(request);
+            BigInteger timePrediction = timeModel.predict(request);
+
+            if (timePrediction.compareTo(new BigInteger("5")) != 1) {
+                costPrediction = BigInteger.ZERO;
+                System.out.println("Request " + request + " will only take " + timePrediction
+                        + " seconds to complete. Ignoring");
+            }
+            sum = sum.add(costPrediction);
         }
 
         if (sum.compareTo(BigInteger.ZERO) == 0) {
@@ -122,53 +171,94 @@ public class InstanceManager {
         if (costModel.getNumberOfPoints().compareTo(new BigInteger("2")) == 1)
             System.out.println("R-squared: " + costModel.getRSquared());
 
-        return costModel.predict(sum);
+        return sum;
     }
 
-    public RequestResult getServer_CostBased(BigInteger inputFactor) {
+    /*
+     *              Algorithm
+     *  Returns the least loaded server based on a certain algorithm
+     */
+
+    /*
+     *  Obtains the least loaded server according to the estimated time to completion 
+     *  of the requests at the server and of this request
+     */
+    public RequestResult getServerTimeBased(BigInteger inputFactor) {
+        return getServerModelBased(inputFactor, (server) -> {
+            return estimateServerTime(server);
+        });
+    }
+
+    /*
+     *  Obtains the least loaded server according to the estimated cost of
+     *  the running requests 
+     */
+    public RequestResult getServerCostBased(BigInteger inputFactor) {
+        return getServerModelBased(inputFactor, (server) -> {
+            return estimateServerCost(server);
+        });
+    }
+
+    /*
+     *  Obtains the least loaded server according to the estimated cost of
+     *  the running requests but also uses time predictions to improve edge cases
+     */
+    public RequestResult getServerTimeDiscounted(BigInteger inputFactor) {
+        return getServerModelBased(inputFactor, (server) -> {
+            return estimateServerDiscounted(server);
+        });
+    }
+
+    /*
+     *  Obtains the least loaded server based on the predictions of the specified 
+     * estimation function
+     */
+    private RequestResult getServerModelBased(BigInteger inputFactor,
+                                              Function<WebServer, BigInteger> estimationFunc) {
         if (instances.size() == 0) {
             System.out.println("There are no servers available");
             return new RequestResult();
-        } else if (costModel.getNumberOfPoints().compareTo(new BigInteger("2")) == -1) {
+        }
+        try {
+            BigInteger lowestCost = new BigInteger("-1");
+            WebServer leastBusyServer = null;
+
+            for (String instanceId : instanceIds) {
+                WebServer server = instances.get(instanceId);
+                int statusCode = server.getInstance().getState().getCode();
+
+                if (server.getAge() <= GRACE_PERIOD || statusCode != RUNNING_CODE) {
+                    System.out.println("Ignoring server: " + instanceId);
+                    continue;
+                }
+
+                BigInteger estimatedLoad = estimationFunc.apply(server);
+                if (estimatedLoad.compareTo(lowestCost) == -1 || lowestCost.intValue() == -1) {
+                    lowestCost = estimatedLoad;
+                    leastBusyServer = server;
+                }
+                System.out.println("Server " + server.getInstance().getInstanceId() + " has load "
+                        + estimatedLoad.toString());
+            }
+
+            if (leastBusyServer != null) {
+                System.out.println("Chose server " + leastBusyServer.getInstance().getInstanceId()
+                        + " with load " + lowestCost.toString());
+                long requestIndex = leastBusyServer.addRequestIfUnlocked(inputFactor);
+                return new RequestResult(leastBusyServer, requestIndex);
+            } else
+                return new RequestResult();
+        } catch (Exception e) {
             // we need at least two data points
-            return getServer_RoundRobin(inputFactor);
+            return getServerRoundRobin(inputFactor);
         }
-
-        BigInteger lowestCost = new BigInteger("-1");
-        WebServer leastBusyServer = null;
-
-        for (String instanceId : instanceIds) {
-            WebServer server = instances.get(instanceId);
-            int statusCode = server.getInstance().getState().getCode();
-
-            if (server.getAge() <= GRACE_PERIOD || statusCode != RUNNING_CODE) {
-                System.out.println("Ignoring server: " + instanceId);
-                continue;
-            }
-
-            BigInteger estimatedLoad = calculateServerLoad(server);
-            if (estimatedLoad.compareTo(lowestCost) == -1 || lowestCost.intValue() == -1) {
-                lowestCost = estimatedLoad;
-                leastBusyServer = server;
-            }
-            System.out.println("Server " + server.getInstance().getInstanceId() + " has load "
-                    + estimatedLoad.toString());
-        }
-
-        if (leastBusyServer != null) {
-            System.out.println("Chose server " + leastBusyServer.getInstance().getInstanceId()
-                    + " with load " + lowestCost.toString());
-            long requestIndex = leastBusyServer.addRequestIfUnlocked(inputFactor);
-            return new RequestResult(leastBusyServer, requestIndex);
-        } else
-            return new RequestResult();
     }
 
     /*
      *  Returns a request index and a server (as an output parameter)
      *  If no server was available, returns -1 
      */
-    public RequestResult getServer_RoundRobin(BigInteger inputFactor) {
+    public RequestResult getServerRoundRobin(BigInteger inputFactor) {
         if (instances.size() == 0) {
             System.out.println("There are no servers available");
             return new RequestResult();
@@ -217,7 +307,7 @@ public class InstanceManager {
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
-        runInstancesRequest.withImageId("ami-47e66d34").withInstanceType("t2.micro").withMinCount(1)
+        runInstancesRequest.withImageId("ami-3e5ed54d").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
                 .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738")
                 .withMonitoring(true)
@@ -263,6 +353,8 @@ public class InstanceManager {
 
         try {
             instances.get(instanceId).shutdown();
+            // TODO: remove the pending requests and add them to another server
+
             TerminateInstancesRequest terminationRequest = new TerminateInstancesRequest();
             terminationRequest.withInstanceIds(instanceId);
             ec2Client.terminateInstances(terminationRequest);
@@ -370,6 +462,7 @@ public class InstanceManager {
             }
 
             if (!foundInstance) {
+                instances.get(instanceId).shutdown();
                 instances.remove(instanceId);
                 instanceIds.remove(instanceId);
             }

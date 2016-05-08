@@ -31,7 +31,7 @@ public class BigIntRegression {
      *  Adds a data point to the model
      */
     public void addData(final BigInteger x, final BigInteger y) {
-        if (n.equals(0)) {
+        if (n.compareTo(BigInteger.ZERO) == 0) {
             xbar = x;
             ybar = y;
         } else {

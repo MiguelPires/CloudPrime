@@ -181,8 +181,8 @@ public class WebServer {
                 try {
                     Thread.sleep(InstanceManager.HEALTH_CHECK_PERIOD);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    continue;
+                    System.out.println("Interrupting health checker");
+                    return;
                 }
             }
         }

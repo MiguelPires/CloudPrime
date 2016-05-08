@@ -31,8 +31,8 @@ public class RequestHandler
     public RequestHandler(InstanceManager manager) {
         this.instanceManager = manager;
         AWSCredentials cred =
-                new ProfileCredentialsProvider("credentials", "default").getCredentials();
-            s3Client = new AmazonS3Client(cred);
+            new ProfileCredentialsProvider("credentials", "default").getCredentials();
+        s3Client = new AmazonS3Client(cred);
     }
 
     public void handle(HttpExchange exchange) throws IOException {
@@ -63,7 +63,7 @@ public class RequestHandler
                 return;
             }
 
-            RequestResult result = instanceManager.getServer_CostBased(inputBigInt);
+            RequestResult result = instanceManager.getServerTimeDiscounted(inputBigInt);
 
             if (result == null || !result.isResponseValid())
                 throw new NoAvailableServerException(
@@ -96,19 +96,17 @@ public class RequestHandler
             writer.println(inputNumber + " , " + delta);
             writer.close();
             bf.close();
-            
-            String filename = "metrics-"+System.nanoTime();
+
+            String filename = "metrics-" + System.nanoTime();
             bf = new BufferedWriter(new FileWriter(filename));
             writer = new PrintWriter(bf);
-            writer.println("Input:"+inputNumber);
-            writer.println("Time:"+delta);
+            writer.println("Input:" + inputNumber);
+            writer.println("Time:" + delta);
             writer.close();
             bf.close();
-            
 
             File timeFile = new File(filename);
-            s3Client.putObject(
-                    new PutObjectRequest("cloudprime-timing", filename, timeFile));
+            s3Client.putObject(new PutObjectRequest("cloudprime-timing", filename, timeFile));
             timeFile.delete();
 
             if (instanceManager.costModel.getNumberOfPoints().compareTo(new BigInteger("2")) == 1) {
@@ -125,21 +123,21 @@ public class RequestHandler
         } catch (Exception e) {
             e.printStackTrace();
             response = e.getMessage();
-            exchange.sendResponseHeaders(404, response.length());
+            //  exchange.sendResponseHeaders(404, response.length());
         } finally {
-            OutputStream outStream = exchange.getResponseBody();
-            outStream.write(response.getBytes());
-            outStream.close();
-
             if (server != null && requestIndex != -1) {
-                // TODO: requests are not being removed correctly
-                // TODO: switch the request array to another (better) structure
                 System.out.println("Removing request");
                 System.out.println("Requests " + server.getRequests().toString());
                 server.removeRequest(requestIndex);
                 System.out.println("Requests " + server.getRequests().toString());
-
+            } else {
+                System.out.println("Couldn't remove request");
             }
+
+            OutputStream outStream = exchange.getResponseBody();
+            outStream.write(response.getBytes());
+            outStream.close();
+
             exchange.close();
         }
     }

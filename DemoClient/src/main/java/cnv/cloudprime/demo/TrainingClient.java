@@ -23,7 +23,7 @@ public class TrainingClient {
             try {
                 final URL newUserUrl = new URL("http://localhost/f.html?n=" + semiprime.toString(10));
 
-                System.out.println("Requesting");
+                System.out.println("Requesting "+semiprime);
                 HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
                 int responseCode = connection.getResponseCode();
 

@@ -30,7 +30,7 @@ public class AutoScaler
     // this is measured in seconds
     private static final int COOLDOWN_PERIOD = 180;
     // how many minutes are going into the CPU load average
-    private static final int ANALYSIS_TIME_WINDOW = 2;
+    private static final int ANALYSIS_TIME_WINDOW = 1;
     // how long ago did we scale - measured in millis
     private Long lastScale = null;
 

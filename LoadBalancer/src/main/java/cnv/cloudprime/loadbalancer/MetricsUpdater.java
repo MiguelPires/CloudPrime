@@ -34,8 +34,12 @@ public class MetricsUpdater
 
     @Override
     public void run() {
-        new Thread(() -> {trainCostModel();}).start();
-        new Thread(() -> {trainTimeModel();}).start();
+        new Thread(() -> {
+            trainCostModel();
+        }).start();
+        new Thread(() -> {
+            trainTimeModel();
+        }).start();
 
         while (true) {
             ListObjectsRequest listObjectsRequest =
@@ -178,6 +182,7 @@ public class MetricsUpdater
                 }
             }
         }
+        System.out.println("Finished training cost model");
     }
 
     private void trainTimeModel() {
@@ -243,5 +248,6 @@ public class MetricsUpdater
                 }
             }
         }
+        System.out.println("Finished training timing model");
     }
 }

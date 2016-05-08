@@ -7,6 +7,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +35,7 @@ public class InstanceManager {
     // how frequently we check for the instances' health
     public static final int HEALTH_CHECK_PERIOD = 5000;
     // this is measured in seconds
-    static final int GRACE_PERIOD = 150;
+    static final int GRACE_PERIOD = 125;
 
     AmazonEC2Client ec2Client;
     private int lastIndex = 0;
@@ -149,16 +150,27 @@ public class InstanceManager {
      * cost model but discounts requests that are close to completion
      */
     public BigInteger estimateServerDiscounted(WebServer server) {
-        Collection<BigInteger> requests = server.getRequests();
         BigInteger sum = new BigInteger("0");
 
-        for (BigInteger request : requests) {
+        for (Long requestId : server.pendingRequests.keySet()) {
+            BigInteger request = server.pendingRequests.get(requestId);
+            Long requestTime = server.requestTimes.get(requestId);
+
             BigInteger costPrediction = costModel.predict(request);
             BigInteger timePrediction = timeModel.predict(request);
+            System.out.println("Time prediction: " + timePrediction);
 
-            if (timePrediction.compareTo(new BigInteger("5")) != 1) {
+            Long elapsedTime = new Date().getTime() / 1000 - requestTime;
+            BigInteger timeLeft =
+                timeModel.predict(request).subtract(new BigInteger(elapsedTime.toString()));
+            System.out.println("Time left: " + timeLeft);
+
+            if (timeLeft.compareTo(BigInteger.ZERO) != 1)
+                timeLeft = BigInteger.ZERO;
+
+            if (timeLeft.compareTo(new BigInteger("10")) != 1) {
                 costPrediction = BigInteger.ZERO;
-                System.out.println("Request " + request + " will only take " + timePrediction
+                System.out.println("Request " + request + " will only take " + timeLeft
                         + " seconds to complete. Ignoring");
             }
             sum = sum.add(costPrediction);
@@ -307,7 +319,7 @@ public class InstanceManager {
 
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
 
-        runInstancesRequest.withImageId("ami-3e5ed54d").withInstanceType("t2.micro").withMinCount(1)
+        runInstancesRequest.withImageId("ami-fd1f948e").withInstanceType("t2.micro").withMinCount(1)
                 .withMaxCount(instancesNum).withKeyName("cnv-lab-aws")
                 .withSubnetId("subnet-8cc5dcfb").withSecurityGroupIds("sg-5cdad738")
                 .withMonitoring(true)
@@ -428,6 +440,7 @@ public class InstanceManager {
                     if (instanceCode != RUNNING_CODE) {
                         System.out.println(
                                 "#\tInstance " + instance.getInstanceId() + " stopped working");
+                        instances.get(instance.getInstanceId()).shutdown();
                         instanceIds.remove(instance.getInstanceId());
                         instances.remove(instance.getInstanceId());
                     }

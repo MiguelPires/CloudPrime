@@ -22,10 +22,9 @@ import com.amazonaws.services.ec2.model.RebootInstancesRequest;
 public class WebServer {
     private Instance instance;
     // the requests that are currently being factored
-    private ConcurrentHashMap<Long, BigInteger> pendingRequests =
-        new ConcurrentHashMap<Long, BigInteger>();
-    // the times in which the requests began running
-    private ConcurrentHashMap<Long, Long> requestingTimes = new ConcurrentHashMap<>();
+    ConcurrentHashMap<Long, BigInteger> pendingRequests = new ConcurrentHashMap<Long, BigInteger>();
+    // the times in which the requests began running - in seconds
+    ConcurrentHashMap<Long, Long> requestTimes = new ConcurrentHashMap<>();
     //
     private AtomicLong requestId = new AtomicLong();
     // the launch time of this instance
@@ -64,7 +63,7 @@ public class WebServer {
             if (serverLock.tryLock()) {
                 long id = requestId.incrementAndGet();
                 pendingRequests.put(id, request);
-                requestingTimes.put(id, new Date().getTime());
+                requestTimes.put(id, new Date().getTime() / 1000);
                 return id;
             } else
                 return -1;
@@ -78,7 +77,7 @@ public class WebServer {
      */
     public synchronized void removeRequest(long requestIndex) {
         pendingRequests.remove(requestIndex);
-        requestingTimes.remove(requestIndex);
+        requestTimes.remove(requestIndex);
     }
 
     /*

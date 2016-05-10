@@ -10,7 +10,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Random;
 
-public class SemiprimesClient {
+public class MediumLoadClient {
     public static void main(String[] args) throws MalformedURLException, InterruptedException {
         Random rand = new Random(System.nanoTime());
         

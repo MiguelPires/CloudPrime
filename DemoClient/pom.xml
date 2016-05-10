@@ -28,7 +28,11 @@
 				</execution>
 			</executions>
 			<configuration>
-				<mainClass>cnv.cloudprime.demo.TrainingClient</mainClass>
+				<mainClass>cnv.cloudprime.demo.InputClient</mainClass>
+				<arguments>
+					<argument>${firstPrime}</argument>
+					<argument>${secondPrime}</argument>
+				</arguments>
 			</configuration>
 		</plugin>
 	</plugins>

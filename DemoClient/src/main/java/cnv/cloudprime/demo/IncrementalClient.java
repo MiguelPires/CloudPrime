@@ -27,7 +27,7 @@ public class IncrementalClient {
                     BigInteger.valueOf(primeOne).multiply(BigInteger.valueOf(primeTwo));
 
                 final URL newUserUrl =
-                    new URL("http://cnv-checkpoint-1585225389.eu-west-1.elb.amazonaws.com/f.html?n="
+                    new URL("localhost/f.html?n="
                             + semiPrime.toString(10));
 
                 /* Thread thread = new Thread() {

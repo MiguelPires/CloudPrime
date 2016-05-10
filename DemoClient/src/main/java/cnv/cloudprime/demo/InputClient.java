@@ -8,17 +8,28 @@ import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Random;
 
-public class HighLoadClient {
-
+public class InputClient {
     public static void main(String[] args) throws MalformedURLException, InterruptedException {
-        BigInteger number = BigInteger.valueOf(11566174444L);
 
-        final URL newUserUrl = new URL("http://localhost/f.html?n=" + number.toString(10));
+        if (args.length < 2) {
+            System.out.println("Please input the two initial bit lengths");
+        }
+        Random rand = new Random(System.nanoTime());
+
+
+        BigInteger firstPrime = BigInteger.probablePrime(Integer.parseInt(args[0]), rand);
+        BigInteger secondPrime = BigInteger.probablePrime(Integer.parseInt(args[1]), rand);
 
         while (true) {
+
+            BigInteger semiprime = firstPrime.multiply(secondPrime);
             try {
-                System.out.println("Requesting");
+                final URL newUserUrl =
+                    new URL("http://localhost/f.html?n=" + semiprime.toString(10));
+
+                System.out.println("Requesting ");
                 HttpURLConnection connection = (HttpURLConnection) newUserUrl.openConnection();
                 int responseCode = connection.getResponseCode();
 
@@ -28,7 +39,8 @@ public class HighLoadClient {
                 inputStream.close();
 
                 if (responseCode != 200) {
-                    System.out.println("Responded with '" + responseCode + "' to number " + number);
+                    System.out.println("Responded with '" + responseCode + "' to number "
+                            + semiprime.toString(10));
                     System.out.println("Message: " + line);
                     Thread.sleep(4000);
                 } else {
@@ -42,7 +54,9 @@ public class HighLoadClient {
             } catch (InterruptedException e) {
                 e.printStackTrace();
                 Thread.sleep(4000);
-
+            } finally {
+                firstPrime = firstPrime.nextProbablePrime();
+                secondPrime = secondPrime.nextProbablePrime();
             }
         }
     }

@@ -63,7 +63,7 @@ public class RequestHandler
                 return;
             }
 
-            RequestResult result = instanceManager.getServerTimeDiscounted(inputBigInt);
+            RequestResult result = instanceManager.getServerCostBased(inputBigInt);
 
             if (result == null || !result.isResponseValid())
                 throw new NoAvailableServerException(

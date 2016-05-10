@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -54,6 +55,8 @@ public class InstanceManager {
     BigIntRegression costModel = new BigIntRegression();
     //
     BigIntRegression timeModel = new BigIntRegression();
+    //
+    private Random rand = new Random(System.nanoTime());
 
     public InstanceManager(String inAWS) throws IOException {
         if (inAWS.equals("true")) {
@@ -233,7 +236,7 @@ public class InstanceManager {
         }
         try {
             BigInteger lowestCost = new BigInteger("-1");
-            WebServer leastBusyServer = null;
+            List<WebServer> leastBusyServers = new ArrayList<WebServer>();
 
             for (String instanceId : instanceIds) {
                 WebServer server = instances.get(instanceId);
@@ -247,17 +250,34 @@ public class InstanceManager {
                 BigInteger estimatedLoad = estimationFunc.apply(server);
                 if (estimatedLoad.compareTo(lowestCost) == -1 || lowestCost.intValue() == -1) {
                     lowestCost = estimatedLoad;
-                    leastBusyServer = server;
+                    leastBusyServers.clear();
+                    leastBusyServers.add(server);
+                } else if (estimatedLoad.compareTo(lowestCost) == 0) {
+                    leastBusyServers.add(server);
                 }
+
                 System.out.println("Server " + server.getInstance().getInstanceId() + " has load "
                         + estimatedLoad.toString());
             }
 
-            if (leastBusyServer != null) {
-                System.out.println("Chose server " + leastBusyServer.getInstance().getInstanceId()
-                        + " with load " + lowestCost.toString());
-                long requestIndex = leastBusyServer.addRequestIfUnlocked(inputFactor);
-                return new RequestResult(leastBusyServer, requestIndex);
+            if (!leastBusyServers.isEmpty()) {
+                while (!leastBusyServers.isEmpty()) {
+                    int chosenIndex = rand.nextInt(leastBusyServers.size());
+
+                    WebServer leastBusy = leastBusyServers.get(chosenIndex);
+                    long requestIndex = leastBusy.addRequestIfUnlocked(inputFactor);
+
+                    if (requestIndex == -1) {
+                        // the server was removed in the meantime
+                        leastBusyServers.remove(leastBusy);
+                        continue;
+                    }
+
+                    System.out.println("Chose server " + leastBusy.getInstance().getInstanceId()
+                            + " with load " + lowestCost.toString());
+                    return new RequestResult(leastBusy, requestIndex);
+                }
+                return getServerRoundRobin(inputFactor);
             } else
                 return new RequestResult();
         } catch (Exception e) {

@@ -53,9 +53,10 @@ public class InstanceManager {
     // the regression model that models the distribution of a "cost"
     // variable (dependent) and a factor variable (independent)
     BigIntRegression costModel = new BigIntRegression();
-    //
+    // the regression model that models the distribution of the time
+    // variable (dependent) and a factor variable (independent)
     BigIntRegression timeModel = new BigIntRegression();
-    //
+    //  random number generator
     private Random rand = new Random(System.nanoTime());
 
     public InstanceManager(String inAWS) throws IOException {
@@ -351,9 +352,9 @@ public class InstanceManager {
 
     /*
      *  Tries to remove a certain number of instances without making requests fail
-     *  Returns the number of instances actually removed (may be fewer than requested)
+     *  If there aren't as much idle instances as request, removes working instances
      */
-    public int decreaseGroup(int instancesNum) {
+    public void decreaseGroup(int instancesNum) {
         int removedInstances = 0;
 
         for (int i = 0; i < instanceIds.size();) {
@@ -364,7 +365,7 @@ public class InstanceManager {
                 if (server.lockIfIdle()) {
                     decreaseGroup(instanceId);
                     if (++removedInstances == instancesNum)
-                        return removedInstances;
+                        return;
                 } else {
                     i++;
                 }
@@ -374,7 +375,23 @@ public class InstanceManager {
             }
         }
 
-        return removedInstances;
+        // couldn't remove only idle instances
+        // will remove working instances
+        if (removedInstances < instancesNum) {
+            for (int i = 0; i < instanceIds.size(); ++i) {
+                String instanceId = instanceIds.get(i);
+                WebServer server = instances.get(instanceId);
+                if (server.tryLock()) {
+                    decreaseGroup(instanceId);
+                    if (++removedInstances == instancesNum) {
+                        return;
+                    }
+                }
+            }
+
+        }
+
+        return;
     }
 
     /*
@@ -385,8 +402,6 @@ public class InstanceManager {
 
         try {
             instances.get(instanceId).shutdown();
-            // TODO: remove the pending requests and add them to another server
-
             TerminateInstancesRequest terminationRequest = new TerminateInstancesRequest();
             terminationRequest.withInstanceIds(instanceId);
             ec2Client.terminateInstances(terminationRequest);

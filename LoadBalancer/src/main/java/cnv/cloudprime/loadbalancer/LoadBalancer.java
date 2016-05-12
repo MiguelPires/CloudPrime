@@ -12,7 +12,9 @@ public class LoadBalancer {
 
         HttpServer server = HttpServer.create(new InetSocketAddress(80), 0);
         InstanceManager manager = new InstanceManager(inAWS);
-        server.createContext("/", new RequestHandler(manager));
+
+        RequestHandler reqHandler = new RequestHandler(manager);
+        server.createContext("/", reqHandler);
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.start();
         System.out.println("Load Balancer running");
@@ -21,7 +23,7 @@ public class LoadBalancer {
         Thread thread = new Thread(autoscaler);
         thread.start();
         System.out.println("Auto scaler running");
-        
+
 
         System.out.println("Ctrl-C to terminate load balancer");
         System.in.read();

@@ -115,6 +115,14 @@ public class WebServer {
             return false;
     }
 
+    /*
+     *  Acquires the lock on this server if not already acquired.
+     *  No request will be added after the invocation
+     */
+    public synchronized boolean tryLock() {
+        return serverLock.tryLock();
+    }
+
     public synchronized void shutdown() {
         healthChecker.interrupt();
     }
@@ -157,7 +165,7 @@ public class WebServer {
                             unhealthyChecks = 0;
                         }
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        // e.printStackTrace();
                         ++unhealthyChecks;
                         System.out.println("Health Check - Unhealthy instance detected. Strike: "
                                 + unhealthyChecks);
@@ -165,15 +173,15 @@ public class WebServer {
                         if (unhealthyChecks >= InstanceManager.HEALTHY_TRESHOLD) {
                             System.out.println("Rebooting instance " + instance.getInstanceId());
 
-                            // reset the server's state
-                            unhealthyChecks = 0;
-                            launchTime = new Date();
-
                             List<String> instanceIds = new ArrayList<String>();
                             instanceIds.add(getInstance().getInstanceId());
                             RebootInstancesRequest rebootRequest =
                                 new RebootInstancesRequest(instanceIds);
                             instanceManager.ec2Client.rebootInstances(rebootRequest);
+
+                            // reset the server's state
+                            unhealthyChecks = 0;
+                            launchTime = new Date();
                         }
                     }
                 }

@@ -20,8 +20,8 @@ public class AutoScaler
     private GetMetricStatisticsRequest metricsRequest;
 
     // *** System Parameters ***
-    private static final int MIN_INSTANCES = 3;
-    private static final int MAX_INSTANCES = 5;
+    private static final int MIN_INSTANCES = 1;
+    private static final int MAX_INSTANCES = 6;
     // these are measured in percentage
     private static final float MAX_CLUSTER_LOAD = 80.0f;
     private static final float MIN_CLUSTER_LOAD = 30.0f;

@@ -120,11 +120,6 @@ public class RequestHandler
 
             // forward the webserver's response
             exchange.sendResponseHeaders(responseCode, response.length());
-        } catch (Exception e) {
-            e.printStackTrace();
-            response = e.getMessage();
-            //  exchange.sendResponseHeaders(404, response.length());
-        } finally {
             if (server != null && requestIndex != -1) {
                 System.out.println("Removing request");
                 System.out.println("Requests " + server.getRequests().toString());
@@ -136,6 +131,15 @@ public class RequestHandler
 
             OutputStream outStream = exchange.getResponseBody();
             outStream.write(response.getBytes());
+            outStream.close();
+
+            exchange.close();
+
+        } catch (NoAvailableServerException e) {
+            e.printStackTrace();
+            exchange.sendResponseHeaders(404, e.getMessage().length());
+            OutputStream outStream = exchange.getResponseBody();
+            outStream.write(e.getMessage().getBytes());
             outStream.close();
 
             exchange.close();

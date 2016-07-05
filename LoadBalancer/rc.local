@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# This script will be executed *after* all the other init scripts.
+# You can put your own initialization stuff in here if you don't
+# want to do the full Sys V style init stuff.
+
+touch /var/lock/subsys/local
+
+exec 2> /tmp/rc.local.log      # send stderr from rc.local to a log file
+exec 1>&2                      # send stdout to the same log file
+set -x
+
+PATH=$PATH:/usr/bin;
+export PATH
+export M2_HOME=/usr/local/apache-maven
+export M2=$M2_HOME/bin
+export PATH=$M2:$PATH
+
+cd home/ec2-user/CloudPrime
+#mvn clean install -DskipTests
+cd LoadBalancer 
+mvn exec:java
+

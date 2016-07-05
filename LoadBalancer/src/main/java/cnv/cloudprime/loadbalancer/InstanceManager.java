@@ -490,7 +490,7 @@ public class InstanceManager {
      */
     private void checkForUnavailableInstances(List<Reservation> reservations) {
         // check if any of the instances are no longer running
-        for (String instanceId : instances.keySet()) {
+        outer: for (String instanceId : instances.keySet()) {
             boolean foundInstance = false;
 
             for (Reservation reservation : reservations) {
@@ -499,21 +499,14 @@ public class InstanceManager {
                     continue;
 
                 for (Instance instance : reservation.getInstances()) {
-                    if (instance.getInstanceId().equals(instanceId)) {
-                        foundInstance = true;
-                        break;
-                    }
-                }
-                if (foundInstance) {
-                    break;
+                    if (instance.getInstanceId().equals(instanceId))
+                        continue outer;
                 }
             }
 
-            if (!foundInstance) {
-                instances.get(instanceId).shutdown();
-                instances.remove(instanceId);
-                instanceIds.remove(instanceId);
-            }
+            instances.get(instanceId).shutdown();
+            instances.remove(instanceId);
+            instanceIds.remove(instanceId);
         }
     }
 }

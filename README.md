@@ -1,5 +1,5 @@
 
-# CloudPrime #
+# CloudPrime 
 
 ## Further instructions ##
 
@@ -13,10 +13,10 @@ webServer directories (the scripts' path should be /etc/rc.local). Note that
 the rc.local scripts assume that maven is installed in /usr/local/apache-maven. 
 To install maven, just run the following commands:
 
-$ wget http://www-us.apache.org/dist/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz
+<pre><code>$ wget http://www-us.apache.org/dist/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz
 $ tar -xzf apache-maven-3.3.9-bin.tar.gz
 $ mv apache-maven-3.3.9 apache-maven
-$ sudo mv apache-maven /usr/local
+$ sudo mv apache-maven /usr/local </code></pre>
 
 The rc.local scripts also assume that the project is already compiled. The 
 compilation and instrumentation commands are commented out in the scripts. 
@@ -25,12 +25,12 @@ Upon boot of the instance, the script will run the module.
 Note that the scripts will redirect the output to a /tmp/rc.local.log file, so if
 you want to see what's going on just run:
 
-$tail -f /tmp/rc.local.log
+<pre><code>$ tail -f /tmp/rc.local.log</code></pre>
 
 Also, don't forget to install Java:
 
-$ sudo yum update
-$ sudo yum install java-devel
+<pre><code>$ sudo yum update
+$ sudo yum install java-devel</code></pre>
 
 If you have any questions or remarks, please send them to miguel(dot)pires(at)ist.utl.pt
 

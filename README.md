@@ -1,7 +1,7 @@
 
 # CloudPrime 
 
-**CloudPrime** is an elastic cluster of web servers that provides an integer factorization service. The system is organized into four main components:
+**CloudPrime** is a load balancer/auto-scaler that uses regression to predict future load based on current requests and scale appropriately. The auto-scaler collects performance metrics associated with certain input requests and uses them to train a predictive model. This model is then used to auto-scale an elastic cluster of web servers that provide an integer factorization service. The system is organized into four main components:
 * **Web Servers** - EC2 instances that receive HTTP requests to perform factorizations, run them
 and return the results. 
 * **Load Balancer** - The load balancer is the entry point into the CloudPrime system. It
